@@ -13,4 +13,5 @@ patterns will be read from first block of file, split on whitespace
 > python swga_bwt_cnt.py index_name pattern_file
 
 to quickly run all in index, do something like:
-> ls idx/*BWT* | perl -pe 's/\.BWT\.npy//gi' | xargs -Irepl python swga_bwt_cnt.py repl ../PATTERNS_FILE.txt 
+> cd index_dir
+> ls *BWT* | perl -pe 's/\.BWT\.npy//gi' | xargs -Irepl python ../swga_bwt_cnt.py repl ../PATTERNS_FILE.txt ../out/repl.out
