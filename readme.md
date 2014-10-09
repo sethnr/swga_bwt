@@ -1,5 +1,10 @@
-scripts for counting swga tags across target genome
-uses BWT for indexing of fastas
+scripts for selecting and designing tags for selective WGA (swga)
+counting swga tags across target genome, and using BWT for indexing of fastas
+SWGA technique developed by Leichty / Brisson [Genetics 2014 |
+http://www.genetics.org/content/early/2014/08/05/genetics.114.165498.abstract]
+
+
+requires numpy, hpy5
 
 swga_bwt_idx = build index of chrs from fasta (currently uncompressed), split into blocks
 > python swga_bwt_idx.py FASTA.fa block_size
