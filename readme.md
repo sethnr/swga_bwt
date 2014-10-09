@@ -11,3 +11,6 @@ swga_bwt_idx = build index of chrs from fasta (currently uncompressed), split in
 swga_bwt_cnt = count occurrences of tags in index blocks
 patterns will be read from first block of file, split on whitespace
 > python swga_bwt_cnt.py index_name pattern_file
+
+to quickly run all in index, do something like:
+> ls idx/*BWT* | perl -pe 's/\.BWT\.npy//gi' | xargs -Irepl python swga_bwt_cnt.py repl ../PATTERNS_FILE.txt 
