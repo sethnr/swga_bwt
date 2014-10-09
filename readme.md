@@ -1,7 +1,6 @@
 scripts for selecting and designing tags for selective WGA (swga)
 counting swga tags across target genome, and using BWT for indexing of fastas
-SWGA technique developed by Leichty / Brisson [Genetics 2014 |
-http://www.genetics.org/content/early/2014/08/05/genetics.114.165498.abstract]
+SWGA technique developed by Leichty / Brisson [http://www.genetics.org/content/early/2014/08/05/genetics.114.165498.abstract | genetics 2014]
 
 
 requires numpy, hpy5
