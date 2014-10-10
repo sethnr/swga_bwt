@@ -44,14 +44,18 @@ def countMatchesNP(baseRanks, first, p):
 # do some stuff
 ############
 
+backgrounds = ['./idx/Anopheles-gambiae-PEST_CHROMOSOMES_AgamP4.3000.IDX.hdf5',
+           'Homo_sapiens.GRCh38.dna_sm.primary_assembly.3000.IDX.hdf5']
+
 idxfile = sys.argv[1]
 patternfile = sys.argv[2]
 
-if len(sys.argv) > 3:
-  outfile = sys.argv[3]
-  out = open(outfile,'w')
-else:
-  out = sys.stdout
+out = sys.stdout
+
+#if len(sys.argv) > 3:
+#  outfile = sys.argv[3]
+#  out = open(outfile,'w')
+
 
 pfile = open(patternfile,'r')
 patterns = []
@@ -60,25 +64,45 @@ for line in pfile:
   patterns += [F[0]]
 
 #guess chrname and blocksize from indexname
-fasta, chrname, blocksize = path.basename(idxfile).split('.')
+fasta, blocksize = path.basename(idxfile).split('.')
 
 blocksize = int(blocksize)
-chr_index = np.load(idxfile+".IDX.npy")
-chr_bwts = np.load(idxfile+".BWT.npy")
+#chr_index = np.load(idxfile+".IDX.npy")
+#chr_bwts = np.load(idxfile+".BWT.npy")
 
-print >> sys.stderr, fasta, blocksize, chrname
-blocks = chr_index.shape[0]
+index = h5.File(idxfile+".IDX.hdf5", "r")
+
+if len(sys.argv) > 3:
+  chrs = sys.argv[3:]
+else:
+  chrs = index.keys()
+
+
+
+#for b in backgrounds:
+#  background = h5file(b,"r")
+#  b_index = index["subset/idx"]
+#  b_bwts = index["subset/bwt"]
+#  for p in patterns:
+#    
+  
+for chr in chrs:
+  chr_index = index[chr+"/idx"]
+  chr_bwts = index[chr+"/bwt"]
+
+  print >> sys.stderr, fasta, blocksize, chr
+  blocks = chr_index.shape[0]
 
 #sys.exit(1)
 
-for n in range(0,blocks):
-  baseRanks = chr_index[n]
-  bwt_line = chr_bwts[n]
+  for n in range(0,blocks):
+    baseRanks = chr_index[n]
+    bwt_line = chr_bwts[n]
   
   #get mapping of each base to range of posns in first column 
   #(all contiguous as col is sorted)
-  firstColMap = firstColNP(baseRanks[-1])
-  print >> out, chrname, n*blocksize, (n+1)*blocksize, blocksize,
-  for p in patterns:
-    print >> out, countMatchesNP(baseRanks,firstColMap,p),
-  print >> out, ""
+    firstColMap = firstColNP(baseRanks[-1])
+    print >> out, chr, n*blocksize, (n+1)*blocksize, blocksize,
+    for p in patterns:
+      print >> out, countMatchesNP(baseRanks,firstColMap,p),
+    print >> out, ""

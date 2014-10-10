@@ -86,11 +86,11 @@ for chr in seq:
 #  chr_index = np.empty(shape=(lastBlock+1,blocksize+1,len(allBases)),dtype='int')
 #  chr_bwts = np.empty(shape=(lastBlock+1,blocksize+1),dtype='string_')
 
-  chr_index = index.create_dataset("index/"+name, 
+  chr_index = index.create_dataset(name+"/idx", 
                                    (lastBlock+1,blocksize+1,len(allBases)), 
                                    dtype='i',
                                    compression=compression)
-  chr_bwts = index.create_dataset("bwt/"+name, 
+  chr_bwts = index.create_dataset(name+"/bwt", 
                                   (lastBlock+1,blocksize+1), 
                                   dtype='S1',
                                   compression = compression)
