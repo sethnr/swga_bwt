@@ -6,6 +6,7 @@ from Bio.Seq import Seq
 from math import floor,ceil
 import numpy as np
 import h5py as h5
+import os.path as path
 #import profile
 
 
@@ -59,19 +60,42 @@ blocksize = int(sys.argv[2])
 print fasta
 seq = SeqIO.parse(open(fasta),'fasta')
 
+fasta = path.basename(fasta)
+fasta = fasta.replace('.fasta','')
+fasta = fasta.replace('.fa','')
+idxfile = "./idx/"+fasta+"."+str(blocksize)
+
+index = h5.File(idxfile+".IDX.hdf5", "w")
+#compression = None
+compression = 'gzip'
+
 #ci = 0
 for chr in seq:
 #  ci += 1
 #  if ci > 1: sys.exit(1)
+
+  
   name = chr.id    
   seqlen = len(chr.seq)
-  print name, seqlen
+#  print name, seqlen, blocksize, lastBlock
   lastBlock = (seqlen/blocksize)
     #lastBlock #rounds down as both are integers
+  print name, seqlen, blocksize, lastBlock
   
   #indices - add one to blocksize for EOL marker ($)
-  chr_index = np.empty(shape=(lastBlock+1,blocksize+1,len(allBases)),dtype='int')
-  chr_bwts = np.empty(shape=(lastBlock+1,blocksize+1),dtype='string_')
+#  chr_index = np.empty(shape=(lastBlock+1,blocksize+1,len(allBases)),dtype='int')
+#  chr_bwts = np.empty(shape=(lastBlock+1,blocksize+1),dtype='string_')
+
+  chr_index = index.create_dataset("index/"+name, 
+                                   (lastBlock+1,blocksize+1,len(allBases)), 
+                                   dtype='i',
+                                   compression=compression)
+  chr_bwts = index.create_dataset("bwt/"+name, 
+                                  (lastBlock+1,blocksize+1), 
+                                  dtype='S1',
+                                  compression = compression)
+#  print chr_bwts.compression
+
 
   for n in range(0,lastBlock+1):
     end = (n+1)*blocksize
@@ -82,18 +106,19 @@ for chr in seq:
     else:  
       seqblock = chr.seq[n*blocksize:end]
       
-    print n, n*blocksize, end, len(seqblock)
+#    print n, n*blocksize, end, len(seqblock)
     bwt_line = bwt(str(seqblock))     
     baseRanks = rankAllBwtNP(bwt_line)
     
     chr_index[n] = baseRanks
     chr_bwts[n] = bwt_line
-
-  fasta = fasta.replace('.fasta','')
-  fasta = fasta.replace('.fa','')
-  idxfile = "./idx/"+fasta+"."+name+"."+str(blocksize)
+  
+#  fasta = path.basename(fasta)
+#  fasta = fasta.replace('.fasta','')
+#  fasta = fasta.replace('.fa','')
+#  idxfile = "./idx/"+fasta+"."+name+"."+str(blocksize)
 #  idxfile = fasta+"."+name+"."+str(blocksize)
-  np.save(idxfile+".IDX.npy",chr_index)
-  np.save(idxfile+".BWT.npy",chr_bwts)  
+#  np.save(idxfile+".IDX.npy",chr_index)
+#  np.save(idxfile+".BWT.npy",chr_bwts)  
     #if n > 10: sys.exit(1)
-
+  

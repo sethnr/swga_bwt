@@ -47,6 +47,12 @@ def countMatchesNP(baseRanks, first, p):
 idxfile = sys.argv[1]
 patternfile = sys.argv[2]
 
+if len(sys.argv) > 3:
+  outfile = sys.argv[3]
+  out = open(outfile,'w')
+else:
+  out = sys.stdout
+
 pfile = open(patternfile,'r')
 patterns = []
 for line in pfile:
@@ -60,7 +66,7 @@ blocksize = int(blocksize)
 chr_index = np.load(idxfile+".IDX.npy")
 chr_bwts = np.load(idxfile+".BWT.npy")
 
-print fasta, blocksize, chrname
+print >> sys.stderr, fasta, blocksize, chrname
 blocks = chr_index.shape[0]
 
 #sys.exit(1)
@@ -72,7 +78,7 @@ for n in range(0,blocks):
   #get mapping of each base to range of posns in first column 
   #(all contiguous as col is sorted)
   firstColMap = firstColNP(baseRanks[-1])
-  print n, n*blocksize, (n+1)*blocksize, blocksize,
+  print >> out, chrname, n*blocksize, (n+1)*blocksize, blocksize,
   for p in patterns:
-    print countMatchesNP(baseRanks,firstColMap,p),
-  print ""
+    print >> out, countMatchesNP(baseRanks,firstColMap,p),
+  print >> out, ""
