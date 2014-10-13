@@ -61,8 +61,11 @@ pfile = open(patternfile,'r')
 patterns = []
 for line in pfile:
   F = line.split()
-  patterns += [F[0]]
-
+  if len(F) > 1:
+    patterns += [F[0]]
+  else:
+    patterns += [line.rstrip('\n').lower()]
+  print patterns
 #guess chrname and blocksize from indexname
 fasta, blocksize = path.basename(idxfile).split('.')
 
