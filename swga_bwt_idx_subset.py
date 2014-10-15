@@ -87,17 +87,17 @@ for chr in seq:
   genomeSize += seqlen
   lastBlock = (seqlen/blocksize)
   genomeBlocks += lastBlock
-totalBlocks = int(ceil(genomeBlocks*percent))
+totalBlocks = int((genomeBlocks*percent))
 
-#print genomeSize, genomeBlocks
-#print genomeSize*percent, int(floor(genomeBlocks*percent))
+print "blocks",totalBlocks, blocksize+1
+print genomeSize*percent, int(floor(genomeBlocks*percent))
 
 chr_index = index.create_dataset("subset/idx",
-                                 (totalBlocks,blocksize+1,len(allBases)), 
+                                 (totalBlocks+1,blocksize+1,len(allBases)), 
                                  dtype='i',
                                  compression=compression)
 chr_bwts = index.create_dataset("subset/bwt", 
-                                (totalBlocks,blocksize+1), 
+                                (totalBlocks+1,blocksize+1), 
                                 dtype='S1',
                                 compression=compression)
 
@@ -112,7 +112,7 @@ for chr in seq:
   lastBlock = (seqlen/blocksize)
     #lastBlock #rounds down as both are integers
 
-  for n in range(0,lastBlock+1):
+  for n in range(0,lastBlock):
     bi +=1
 
     if bi % (1/percent) == 0:
@@ -131,7 +131,7 @@ for chr in seq:
       i = int(bi/(1/percent))
       chr_index[i] = baseRanks
       chr_bwts[i] = bwt_line
-  print name, ci, "blocks indexed"
+ # print name, ci, "blocks indexed"
 print int(bi/(1/percent)), "blocks indexed"
 
 #  fasta = path.basename(fasta)

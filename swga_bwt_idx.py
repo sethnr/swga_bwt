@@ -107,7 +107,7 @@ for chr in seq:
       seqblock = chr.seq[n*blocksize:end]
       
 #    print n, n*blocksize, end, len(seqblock)
-    bwt_line = bwt(str(seqblock))     
+    bwt_line = bwt(str(seqblock).lower())     
     baseRanks = rankAllBwtNP(bwt_line)
     
     chr_index[n] = baseRanks
