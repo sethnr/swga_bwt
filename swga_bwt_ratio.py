@@ -56,16 +56,20 @@ if len(sys.argv) > 2:
   outfile = sys.argv[2]
   out = open(outfile,'w')
 
-
-pfile = open(patternfile,'r')
-patterns = []
-for line in pfile:
-  F = line.split()
-  patterns += [F[0]]
-
 #guess chrname and blocksize from indexname
 filebits = path.basename(target).split('.')
 fasta, blocksize = filebits[0],filebits[-1]
+
+pfile = open(patternfile,'r')
+patterns = []
+tcount={}
+for line in pfile:
+  #F = line.split()
+  #patterns += [F[0]]
+  pattern, count, countBlock = line.split()
+  patterns += [pattern]
+  tcount[pattern] = float(countBlock)*int(blocksize)
+
 
 blocksize = int(blocksize)
 #chr_index = np.load(idxfile+".IDX.npy")
@@ -86,8 +90,8 @@ def getIndexCounts(target, backgrounds, patterns):
   #t_index = tindex["subset/idx"]
   #t_bwts = tindex["subset/bwt"]
   
-  for b in [target] + backgrounds.values():
-  #for b in backgrounds:
+  #for b in [target] + backgrounds.values():
+  for b in backgrounds.values():
     print b
     b = str(b)+".IDX.hdf5"
     print b
@@ -95,9 +99,15 @@ def getIndexCounts(target, backgrounds, patterns):
     b_index = bgindex["subset/idx"]
     b_bwts = bgindex["subset/bwt"]
   #firstColMap = firstColNP(baseRanks[-1])
+    i = 0
+    noBlocks = b_bwts.shape[0]
+    print >> sys.stderr, b, noBlocks
+    
     for p in patterns:
+      i += 1
+      if i % 10 == 0: print >>sys.stderr, i 
     #print >> out, chr, n*blocksize, (n+1)*blocksize, blocksize,
-      noBlocks = b_bwts.shape[0]
+#      noBlocks = b_bwts.shape[0]
       #noBlocks = 10
       matches = 0
 #      print p,

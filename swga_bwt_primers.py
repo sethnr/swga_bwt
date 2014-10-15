@@ -74,10 +74,13 @@ def getIndexCounts(target, backgrounds, patterns):
 seq = SeqIO.parse(seqfile,'fasta')
 
 primers = set()
+pcount = {}
+genomeLen = 0
 for chr in seq:
     seqstr = str(chr.seq).lower()
     seqlen = len(seqstr)
     print chr.name, seqlen,
+    genomeLen += seqlen
     for i in range(0,seqlen):
         for primerLen in reversed(range(lower_len,upper_len+1)):
             primer = seqstr[i:(i+primerLen)]
@@ -85,7 +88,11 @@ for chr in seq:
             if len(primer) == primerLen:
                 tm = getTM(primer)
                 if tm <= tm_limit:
-                    primers.add(primer)
+                    if primer in primers:
+                        pcount[primer] += 1
+                    else:
+                        primers.add(primer)
+                        pcount[primer] = 1
     print len(primers)
 
 
@@ -105,9 +112,11 @@ else:
 print len(primers)
 
 out = open("candidates.txt","w")
-print >> out, "\n".join(primers)
 
+for primer in primers:
+    print >>out, primer, pcount[primer], float(pcount[primer]) / seqlen
 
+#print >> out, "\n".join(primers)
 
 #backcounts = getIndexCounts(target, background, patterns)
 
