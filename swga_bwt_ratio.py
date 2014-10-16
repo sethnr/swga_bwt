@@ -59,19 +59,21 @@ if len(sys.argv) > 2:
 #guess chrname and blocksize from indexname
 filebits = path.basename(target).split('.')
 fasta, blocksize = filebits[0],filebits[-1]
+blocksize = int(blocksize)
 
 pfile = open(patternfile,'r')
 patterns = []
-tcount={}
+tcounts={}
 for line in pfile:
   #F = line.split()
   #patterns += [F[0]]
   pattern, count, countBlock = line.split()
   patterns += [pattern]
-  tcount[pattern] = float(countBlock)*int(blocksize)
+  tcounts[pattern] = float(countBlock)*blocksize
 
+blockToRPK = float(1000) / blocksize
 
-blocksize = int(blocksize)
+#blocksize = int(blocksize)
 #chr_index = np.load(idxfile+".IDX.npy")
 #chr_bwts = np.load(idxfile+".BWT.npy")
 
@@ -118,7 +120,7 @@ def getIndexCounts(target, backgrounds, patterns):
         match = countMatchesNP(baseRanks,firstColMap,p)
 #        print match,
         matches += match
-        backcounts[p,b] = float(matches) / float(noBlocks)
+        backcounts[p,b] = (float(matches) / float(noBlocks)) * blockToRPK
 #      print ''
   return backcounts
 
@@ -130,7 +132,7 @@ else:
   cachecounts = open("index_counts.pkl","w")
   pkl.dump(backcounts,cachecounts)
 
-#print backcounts
+print backcounts
 
 print >> out, "primer", "t_count",
 for b in backgrounds.keys():
@@ -138,7 +140,8 @@ for b in backgrounds.keys():
 print >> out, "mean_ratio"
 for p in patterns:
 #  print p, target
-  tcount = backcounts[p,target+".IDX.hdf5"]
+#  tcount = backcounts[p,target+".IDX.hdf5"]
+  tcount = tcounts[p]
   ratioTotal = 0
   print >>out, p, tcount, 
   for b in backgrounds.values():
