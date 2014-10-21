@@ -7,6 +7,7 @@ from math import floor,ceil
 import numpy as np
 import h5py as h5
 import os.path as path
+from re import match
 #import profile
 
 
@@ -60,12 +61,17 @@ out = sys.stdout
 pfile = open(patternfile,'r')
 patterns = []
 for line in pfile:
-  F = line.split()
-  if len(F) > 1:
-    patterns += [F[0]]
+  if match('#',line):
+    next
   else:
-    patterns += [line.rstrip('\n').lower()]
-  print patterns
+    F = line.split()
+    if len(F) > 1:
+      patterns += [F[0]]
+    else:
+      patterns += [line.rstrip('\n').lower()]
+    print patterns
+
+#patterns = ['nnnnn'] + patterns
 #guess chrname and blocksize from indexname
 fasta, blocksize = path.basename(idxfile).split('.')
 

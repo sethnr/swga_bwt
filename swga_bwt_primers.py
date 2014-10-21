@@ -115,7 +115,7 @@ out = open("candidates.txt","w")
 
 print >>out, "#primer","total","rpk"
 for primer in primers:
-    print >>out, primer, pcount[primer], (float(pcount[primer]) / seqlen) * 1000
+    print >>out, primer, pcount[primer], (float(pcount[primer]) / genomeLen) * 1000
 
 #print >> out, "\n".join(primers)
 

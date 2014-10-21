@@ -60,6 +60,8 @@ if len(sys.argv) > 2:
 filebits = path.basename(target).split('.')
 fasta, blocksize = filebits[0],filebits[-1]
 blocksize = int(blocksize)
+blockToRPK = float(1000) / blocksize
+print >> sys.stderr, "block to RPK:",blockToRPK
 
 pfile = open(patternfile,'r')
 patterns = []
@@ -68,10 +70,10 @@ for line in pfile:
   #F = line.split()
   #patterns += [F[0]]
   pattern, count, countBlock = line.split()
+  print "pattern",pattern,"count",count,"RPK",countBlock
   patterns += [pattern]
-  tcounts[pattern] = float(countBlock)*blocksize
+  tcounts[pattern] = float(countBlock) #* blockToRPK
 
-blockToRPK = float(1000) / blocksize
 
 #blocksize = int(blocksize)
 #chr_index = np.load(idxfile+".IDX.npy")
@@ -118,23 +120,33 @@ def getIndexCounts(target, backgrounds, patterns):
         firstColMap = firstColNP(baseRanks[-1])
         bwt_line = b_bwts[n]
         match = countMatchesNP(baseRanks,firstColMap,p)
-#        print match,
+#        print match, noBlocks,
         matches += match
         backcounts[p,b] = (float(matches) / float(noBlocks)) * blockToRPK
-#      print ''
+      print p, matches, noBlocks
   return backcounts
 
 if path.exists("index_counts.pkl"):
   cachecounts = open("index_counts.pkl","r")
   backcounts = pkl.load(cachecounts)
+  indexPatterns = [str(i[0]) for i in backcounts.keys()]
+  newPatterns = [p for p in patterns if p not in indexPatterns]
+  print "patterns:", len(patterns), len(newPatterns)
+  if(len(newPatterns) > 0):
+    cachecounts.close()
+    cachecounts = open("index_counts.pkl", 'w')
+    newCounts = getIndexCounts(target,backgrounds,newPatterns)
+    backcounts.update(newCounts)
+    pkl.dump(backcounts,cachecounts)
+    cachecounts.close()
 else:
   backcounts = getIndexCounts(target, backgrounds, patterns)
   cachecounts = open("index_counts.pkl","w")
   pkl.dump(backcounts,cachecounts)
+  cachecounts.close()
+#print backcounts
 
-print backcounts
-
-print >> out, "primer", "t_count",
+print >> out, "#primer", "t_count",
 for b in backgrounds.keys():
   print >>out, str(b)+"_count", str(b)+"_ratio",
 print >> out, "mean_ratio"
@@ -146,8 +158,8 @@ for p in patterns:
   print >>out, p, tcount, 
   for b in backgrounds.values():
     bcount = backcounts[p,b+".IDX.hdf5"]
-    if tcount > 0: ratio = bcount/tcount
-    else: ratio=0.0
+    if bcount > 0: ratio = tcount/bcount
+    else: ratio=float('inf')
     print >>out, bcount, ratio,
     ratioTotal += ratio
   print >>out, ratioTotal / len(backgrounds)
