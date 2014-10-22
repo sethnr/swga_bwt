@@ -19,8 +19,8 @@ bases = ['a','c','t','g']
 #primers = list(map("".join, product(bases, repeat=primerLen)))
 #print len(primers)
 
-tm_limit = 25
-lower_len=12
+tm_limit = 30
+lower_len=8
 upper_len=12
 
 target = './idx/Pf3D7_v3.0.01.3000'
