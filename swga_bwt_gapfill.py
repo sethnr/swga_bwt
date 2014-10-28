@@ -17,7 +17,7 @@ import profile
 import itertools
 import pickle as pkl
 
-import swga_bwt
+import swga_bwt as s
 
 
 #############
@@ -90,53 +90,106 @@ blocksize = int(blocksize)
 
 index = h5.File(idxfile+".IDX.hdf5", "r")
 
-if len(sys.argv) > 3:
+if len(sys.argv) > 4:
   chrs = [chr]
 else:
   chrs = index.keys()
 
+print >>sys.stdout, chrs
 
-if path.exists(tmatchidx):
 
-  tmatchfile = open(tmatchidx,"w")
-  matchcounts, blockPosns, pArray = pkl.load(tmatchidx)
-  tmatchfile.close()
-  primIndices = list(matchcounts.keys(), key=lambda a: a[1])
+matchcounts = None
+blockPosns = None
 
-  #bestorder = sorted(ranks.keys(), key=lambda a: a[0:2])
-  ixdPatterns = allPatterns[primIndices]
-  newPatterns = [p for p in patterns if p not in idxPatterns]
-  if(len(newPatterns) >= 0):
-    newMatchCounts, newBlockPosns = getMatchCounts(index,patterns,blocksize,chrs)
-    matchcounts.update(newMatchCounts)
-    cachecounts = open(tmatchfile, 'w')
-    pkl.dump((matchcounts, block_posns),cachecounts)
-    cachecounts.close()
-else:
-  matchcounts, blockPosns = getMatchCounts(index,patterns,blocksize,chrs)
-  cachecounts = open("match_counts.pkl","w")
-  pkl.dump((matchcounts,blockPosns),cachecounts)
-  cachecounts.close()
+#	if path.exists(tmatchidx):
+#	  print >> sys.stdout, "found file ",tmatchidx
+#	  tmatchfile = open(tmatchidx,"r")
+#	  (matchcounts, blockPosns) = pkl.load(tmatchfile)
+#	  tmatchfile.close()
+#	#  idxPatterns = sorted(matchcounts.keys(), key=lambda a: a[1])
+#	  idxPatterns = set([key[1] for key in matchcounts.keys()])
+#	  newPatterns = [p for p in patterns if p not in idxPatterns]
+#	  print >>sys.stdout, idxPatterns,"\n",newPatterns, len(newPatterns)
+#	  
+#	  if(len(newPatterns) > 0):
+#	    (newMatchCounts, newBlockPosns) = s.getMatchCounts(index,patterns,blocksize,chrs)
+#	    matchcounts.update(newMatchCounts)
+#	    cachecounts = open(tmatchidx, 'w')
+#	    blockPosns.update(newBlockPosns)
+#	    pkl.dump((matchcounts, blockPosns),cachecounts)
+#	    cachecounts.close()
+#	else:
+#	  print >>sys.stdout, tmatchidx, "not found"
+#	  (matchcounts, blockPosns) = s.getMatchCounts(index,patterns,blocksize,chrs)
+#	  print >>sys.stdout, matchcounts
+#	  cachecounts = open("match_counts.pkl","w")
+#	  pkl.dump((matchcounts,blockPosns),cachecounts)
+#	  cachecounts.close()
 
+#initialise index if it doesn't exist
+if not path.exists(tmatchidx):
+  matchindex = h5.File(tmatchfile, "w")
+#compression = None
+  compression = 'gzip'
+  matchcountsNP, blockPosnsNP, pArray = s.initMatchCountsHDF5(index,patterns,chrs)
+  matchindex.close()
+
+
+#update index with new patterns
+tmatchfile = open(tmatchidx,"r")
+matchindex = h5.File(tmatchfile, "a")
+addMatchCountsHDF5(index, newPatterns, matchindex)
+matchindex.close()
+
+
+#	  idxPatterns = set([key[1] for key in matchcounts.keys()])
+#	  newPatterns = [p for p in patterns if p not in idxPatterns]
+#	  print >>sys.stdout, idxPatterns,"\n",newPatterns, len(newPatterns)
+#	  
+#	  if(len(newPatterns) > 0):
+#	    (newMatchCounts, newBlockPosns) = s.getMatchCounts(index,patterns,blocksize,chrs)
+#	    matchcounts.update(newMatchCounts)
+#	    cachecounts = open(tmatchidx, 'w')
+#	    blockPosns.update(newBlockPosns)
+#	    pkl.dump((matchcounts, blockPosns),cachecounts)
+#	    cachecounts.close()
+#	
+#	  (matchcounts, blockPosns) = s.getMatchCounts(index,patterns,blocksize,chrs)
+#	  print >>sys.stdout, matchcounts
+#	  cachecounts = open("match_counts.pkl","w")
+#	  pkl.dump((matchcounts,blockPosns),cachecounts)
+#	  cachecounts.close()
 
 
 #matchcounts, blockPosns = getMatchCounts(index,chrs)
-allBlocks = matchcounts.shape[0]
+#allBlocks = len(matchcounts.keys())
+#print matchcounts
+#matchcounts = np.recarray(matchcounts, dtype=[('pattern',"S15"),("count","i6")])
+#print matchcounts.shape
+#allBlocks = matchcounts.shape[0]
+
+
+
 plex=[]
+
+allBlocks = matchcountsHDF5['matchcounts'].shape[0]
+matchcounts = matchcountsHDF5['matchcounts']
+blockPosns = matchcountsHDF5['block_posns']
+allPatterns = matchcountsHDF5['patterns']
+
 emptyBlocks = np.array([True] * allBlocks)
 
+
+#for all patterns, add pattern index to array if it improves on previous set
 for i in range(0,len(patterns)):
 #  print matchcounts[:,i].transpose()
   stillEmpty = np.sum(matchcounts[:,plex + [i]],axis=1)==0
-
-#  print stillEmpty
   if np.sum(stillEmpty) < np.sum(emptyBlocks):
-#    print >> sys.stderr, i, np.sum(emptyBlocks), np.sum(stillEmpty), len(plex),
-#    print >> sys.stderr, plex
     emptyBlocks = stillEmpty
     plex = plex + [i]
   if len(emptyBlocks)==0:
     break
+
 
 filled = np.array(matchcounts > 0,dtype='bool')
 sdcols = np.std(matchcounts,axis=0)
@@ -164,6 +217,8 @@ print >> sys.stderr, noCombs, " total combinations of ",k," in ",n," elements"
 
 #for comb in combs:
 #len(plex)
+
+#make normal probability distribution from first in pattern to last
 mu, sigma = 0.0, 0.1 # mean and sd
 probs = np.sort(abs(np.random.normal(loc=mu, scale=sigma, size=len(plex))))[::-1]
 probs = probs/sum(probs)
@@ -184,9 +239,6 @@ while i <= noSamples:
 #  print sum(filledRow), sum(filledRowSum)
   sdcomb = sdcols[np.array(comb)]
 
-#  print ratios[:10]
-#  print ratios[np.array(comb)]
-#  print np.mean(ratios[np.array(comb)])
   meanratio = np.mean(ratios[np.array(comb)])
   
   if 0 == 1:
@@ -196,23 +248,15 @@ while i <= noSamples:
     profile.run("np.apply_along_axis(any,arr=filled[:,comb],axis=1)")
     print "ROWSUMMING"
     profile.run("np.sum(matchcounts[:,comb],axis=1)>0")
-#  print "sdcols[np.array(comb)]"
-#  profile.run("sdcols[np.array(comb)]")
-#  print "np.mean(ratios[np.array(comb)])"
-#  profile.run("np.mean(ratios[np.array(comb)])")
-#  print sdcols[:20]
-#  print comb
-#  print sdcomb
-#  print np.mean(sdcomb)
   unfilled = len(filledRow) - sum(filledRow)
   #divide by ten to get rough number of unfilled blocks
   ratioBlock = floor(1/meanratio*1000)/1000
   key = (floor(unfilled/10),ratioBlock,np.mean(sdcomb), i)
   ranks[key] = (comb, unfilled, meanratio)
-#  print ranks[key], key
+
   
 ranks.keys()
-#print ranks.values()
+
 bestorder = sorted(ranks.keys(), key=lambda a: a[0:2])
 
 i = 0;

@@ -80,42 +80,78 @@ def getIndexCounts(backgrounds, patterns, blockToRPK):
   return backcounts
 
 
-def initiateMatchCounts(index, allPatterns, chrs):
+def initMatchCountsHDF5(index, allPatterns, blocksize, chrs, ratios,matchindex):
   allBlocks = 0
   for chr in chrs:
     chr_bwts = index[chr+"/bwt"]
     allBlocks += chr_bwts.shape[0]
-  matchcounts = np.zeros(shape=(allBlocks,len(allPatterns)),dtype='int')
-  blockPosns = np.recarray(shape=(allBlocks,3),dtype=[('chr', 'S12'), ('start', int),('end',int)])
-  blockPosns.fill('0')
-  pArray = np.recarray(shape=(len(allPatterns),2),dtype=[('pattern', 'S20'), ('i', int)])
-  parray['pattern'] = allPatterns
-  parray['i'] = range(0,len(allPatterns))
-  return matchcounts, blockPosns, pArray
+  matchcountsNP = np.zeros(shape=(allBlocks,len(allPatterns)),dtype='int')
+  blockPosnsNP = np.zeros(shape=(allBlocks,2),dtype='int')
+  blockChrsNP = np.empty(shape=(allBlocks,1),dtype='S25')
+  # print >>sys.stderr, allPatterns
+ 
+  bi = -1
+  for chr in chrs:
+    chr_index = index[chr+"/idx"]
+    blocks = chr_index.shape[0]
+    for n in range(0,blocks):
+      bi += 1
+      blockChrsNP[bi] = chr
+      blockPosnsNP[bi] = (n*blocksize,(n+1)*blocksize)
 
-
-def getMatchCounts(index, matchcounts, blockposns, pArray, patterns, blocksize, chrs):
+#  pArray = np.recarray(shape=(len(allPatterns),2),dtype=[('pattern', 'S20'), ('i', int)])
+#  print >>sys.stderr, allPatterns
+#  pArray['pattern'] = allPatterns
+#  pArray['i'] = range(0,len(allPatterns))
   
-  allBlocks = matchcounts.shape[0]
+  
+#  matchindex['matchcounts'] = matchcountsNP
+#  matchindex['blockposns'] = blockPosnsNP
+#  matchindex['patterns'] = allPatterns
+#  matchindex['ratios'] = np.array(ratios,dtype='float')
 
+
+  matchcounts = matchindex.create_dataset('matchcounts', 
+                                          (allBlocks,len(allPatterns)), 
+                                          dtype='int',
+                                          data=matchcountsNP)
+  blockposns = matchindex.create_dataset('blockposns', 
+                                         (allBlocks,2), 
+                                         dtype='int',
+                                         data=blockPosnsNP)
+  blockchrs = matchindex.create_dataset('blockchrs', 
+                                        (allBlocks,), 
+                                        dtype='S25',
+                                        data=blockChrsNP)
+  patterns = matchindex.create_dataset('patterns', 
+                                       (len(allPatterns),), 
+                                       dtype='S20',
+                                       data = allPatterns)  
+  ratios = matchindex.create_dataset('ratios', 
+                                     (len(allPatterns),), 
+                                     dtype='float',
+                                     data=ratios)
+
+  print patterns[:]
+  return matchindex
+
+#non numpy version, so we can use patterns as indices:
+def getMatchCounts(index, patterns, blocksize, chrs):
+  
+#  allBlocks = matchcounts.shape[0]
+  matchcounts = {}
+  blockPosns = {}
 #  matchcounts = np.zeros(shape=(allBlocks,len(patterns)),dtype='int')
 #  blockPosns = np.recarray(shape=(allBlocks,3),dtype=[('chr', 'S12'), ('start', int),('end',int)])
-
-#def getMatchCounts(index, chrs):
-  #sys.exit(1)
-
-  which = np.in1d(pArray, patterns)
-  pis = parray['i'][which]
-  allPatterns = parray['pattern'][which]
-
   bi=-1
   for chr in chrs:
     chr_index = index[chr+"/idx"]
     chr_bwts = index[chr+"/bwt"]
-
-    print >> sys.stderr, fasta, blocksize
+    
+    print >> sys.stderr, chr, chr_index.shape, chr_index, blocksize
     blocks = chr_index.shape[0]
     
+#    print >>sys.stderr, "blocks = ",blocks
     for n in range(0,blocks):
       baseRanks = chr_index[n]
       bwt_line = chr_bwts[n]
@@ -124,14 +160,76 @@ def getMatchCounts(index, matchcounts, blockposns, pArray, patterns, blocksize, 
     #(all contiguous as col is sorted)
       firstColMap = firstColNP(baseRanks[-1])
     
-    #    print >> out, chr, n*blocksize, (n+1)*blocksize, blocksize,
+#      print >> sys.stderr, chr, n*blocksize, (n+1)*blocksize, blocksize, bi
       
-      blockPosns[bi,0:2] = (chr,n*blocksize,(n+1)*blocksize)
-      for pi in pis:
-        p = allPatterns[pi]
+      blockPosns[bi] = (chr,n*blocksize,(n+1)*blocksize)
+      #blockPosns[(bi,0:2)] = (chr,n*blocksize,(n+1)*blocksize)
+      for p in patterns:
+        matchcounts[(bi,p)] = countMatchesNP(baseRanks,firstColMap,p)
+  return matchcounts, blockPosns
+
+#numpy version
+def addMatchCountsHDF5(index, newPatterns, matchcountsHDF5):
+  
+  allBlocks = matchcountsHDF5['matchcounts'].shape[0]
+  matchcounts = matchcountsHDF5['matchcounts']
+  blockPosns = matchcountsHDF5['blockposns']
+  blockChrs = matchcountsHDF5['blockchrs'][:]
+  allPatterns = matchcountsHDF5['patterns'][:]
+  
+#  matchcounts = np.zeros(shape=(allBlocks,len(patterns)),dtype='int')
+#  blockPosns = np.recarray(shape=(allBlocks,3),dtype=[('chr', 'S12'), ('start', int),('end',int)])
+
+  # GET POSITIONS OF PATTERNS IN FILE
+  # for p_index in P_indices
+  
+  patterns = allPatterns[np.in1d(allPatterns, newPatterns)]
+  
+#  pis = allPatterns[np.in1d(allPatterns.pattern, newPatterns),'i']
+  
+  print >>sys.stderr, patterns
+#  print >>sys.stderr, pis
+  
+  chrs = set(blockChrs)
+  bi=-1
+  for chr in chrs:
+    print >> sys.stderr, chr,
+    chr_index = index[chr+"/idx"]
+    chr_bwts = index[chr+"/bwt"]
+    
+    print >> sys.stderr, chr_index.shape, chr_index
+    blocks = chr_index.shape[0]
+    
+#    print >>sys.stderr, "blocks = ",blocks
+    for n in range(0,blocks):
+      baseRanks = chr_index[n]
+      bwt_line = chr_bwts[n]
+      bi +=1
+    #get mapping of each base to range of posns in first column 
+    #(all contiguous as col is sorted)
+      firstColMap = firstColNP(baseRanks[-1])
+    
+#      print >> sys.stderr, chr, n*blocksize, (n+1)*blocksize, blocksize, bi
+      
+      #blockPosns[bi] = (chr,n*blocksize,(n+1)*blocksize)
+      #blockPosns[bi,0:2] = (chr,n*blocksize,(n+1)*blocksize)
+      for p in patterns:
+        pi = int(np.where(allPatterns==p)[0])
+#        print >>sys.stderr, p, pi, bi
         matchcounts[bi,pi] = countMatchesNP(baseRanks,firstColMap,p)
-#      print >> out, countMatchesNP(baseRanks,firstColMap,p),
-  return matchcounts, blockPosns, pArray
+  
+
+
+#def updateMatchCounts(matchcounts, blockPosns, ):
+#  patterns = list(matchcounts.keys(), key=lambda a: a[2])
+#
+#  which = np.in1d(pArray['pattern'], patterns)
+#  pis = parray['i'][which]
+#  patternsNP = parray['pattern'][which]
+#  for i in range(0,len(pis)):
+#    matchcountsNP[bi,pis[i]] = matchcounts[(bi,pis[i])]
+#  print >>sys.stderr, p,"->",pi
+  
+
+#  return matchcounts, blockPosns #, pArray
 #    print >> out, ""
-
-
