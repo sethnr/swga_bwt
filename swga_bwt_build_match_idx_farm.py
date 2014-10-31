@@ -18,7 +18,8 @@ import itertools
 import pickle as pkl
 
 import swga_bwt as s
-
+import argparse
+import os
 
 #############
 # do some stuff
@@ -29,25 +30,42 @@ import swga_bwt as s
 
 
 if len(sys.argv)==1: 
-  print "\n\tpython swga_bwt_build_match_idx.py index_file pattern_file no_patterns_to_check:index\n\n"
+  print "\n\tpython swga_bwt_build_match_idx.py -t target_index -p pattern_file -i match_index \n\n"
   sys.exit(1)
 
-#parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
-#parser.add_argument('-t|--target', dest='idxfile', type=str, help='target genome index')
-#parser.add_argument('-p|--patterns', dest='patternfile', type=strhelp='list of patterns')
-#parser.add_argument('-p|--tmatchidx', dest='tmatchidx', type=str, help='match positions index')
-#parser.add_argument('-o|--out', dest='out', type=str, help='outfile')
 
-#args = parser.parse_args()
+parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
+parser.add_argument('-t|--target', action="store", dest='idxfile', type=str, help='target genome index', nargs='+')
+parser.add_argument('-p|--patterns', action="store", dest='patternfile', type=str, help='list of patterns', nargs='+')
+parser.add_argument('-i|--tmatchidx', action="store", dest='tmatchidx', type=str, help='match positions index', nargs='+')
+parser.add_argument('-o|--out', action="store", dest='out', type=str, help='outfile', nargs='?')
+parser.add_argument('-A|--array', action="store_true", dest='farm', help='run on farm? i.e. use LSB_JOBINDEX')
 
-pi = os.getenv("LSB_JOBINDEX")
+args = parser.parse_args()
 
-idxfile = sys.argv[1]
-patternfile = sys.argv[2]
-patternfile = patternfile+"."+pi
+#pi = os.getenv("LSB_JOBINDEX")
 
-tmatchidx = sys.argv[3]
-out = sys.stdout
+farm = args.farm
+idxfile = args.idxfile[0]
+idxfile = idxfile.replace(".IDX.hdf5","")
+patternfile = args.patternfile[0]
+tmatchidx = args.tmatchidx[0]
+
+#print >>sys.stderr, args.farm
+
+if args.farm is True:
+  pi = os.getenv("LSB_JOBINDEX")
+  if pi == None:
+    sys.exit(100,"pi = none - did you mean to submit an array job?")
+  patternfile = patternfile+"."+pi
+
+out = args.out
+if out == None:
+  out = sys.stdout
+else:
+  out = open(outfile,'w')
+
+
 
 
 #  out = open(outfile,'w')
@@ -79,19 +97,19 @@ index = h5.File(idxfile+".IDX.hdf5", "r")
 chrs = index.keys()
 
 #initialise index if it doesn't exist
-if not path.exists(tmatchidx):
-#  tmatchfile = open(tmatchidx,"w")
-  matchindex = h5.File(tmatchidx, "w")
-#compression = None
-  compression = 'gzip'
-  matchindex =  s.initMatchCountsHDF5(index,allPatterns,blocksize,chrs,ratios,matchindex)
-  print matchindex
-  matchindex.close()
+#if not path.exists(tmatchidx):
+##  tmatchfile = open(tmatchidx,"w")
+#  matchindex = h5.File(tmatchidx, "w")
+##compression = None
+#  compression = 'gzip'
+#  matchindex =  s.initMatchCountsHDF5(index,allPatterns,blocksize,chrs,ratios,matchindex)
+#  print matchindex
+#  matchindex.close()
 
 
 #update index with new patterns
 #tmatchfile = open(tmatchidx,"r")
-matchindex = h5.File(tmatchidx, "a")
+matchindex = h5.File(tmatchidx, 'r+')
 s.addMatchCountsHDF5(index, patterns, matchindex)
 matchindex.close()
 
