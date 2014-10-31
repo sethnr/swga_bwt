@@ -74,7 +74,7 @@ def getIndexCounts(backgrounds, patterns, blockToRPK):
         match = countMatchesNP(baseRanks,firstColMap,p)
 #        print match, noBlocks,
         matches += match
-        backcounts[p,b] = (float(matches) / float(noBlocks)) * blockToRPK
+        backcounts[(p,b)] = (float(matches) / float(noBlocks)) * blockToRPK
       print '.',
       #print p, matches, noBlocks
   return backcounts

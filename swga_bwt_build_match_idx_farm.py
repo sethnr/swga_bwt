@@ -32,22 +32,28 @@ if len(sys.argv)==1:
   print "\n\tpython swga_bwt_build_match_idx.py index_file pattern_file no_patterns_to_check:index\n\n"
   sys.exit(1)
 
+#parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
+#parser.add_argument('-t|--target', dest='idxfile', type=str, help='target genome index')
+#parser.add_argument('-p|--patterns', dest='patternfile', type=strhelp='list of patterns')
+#parser.add_argument('-p|--tmatchidx', dest='tmatchidx', type=str, help='match positions index')
+#parser.add_argument('-o|--out', dest='out', type=str, help='outfile')
+
+#args = parser.parse_args()
+
+pi = os.getenv("LSB_JOBINDEX")
+
 idxfile = sys.argv[1]
 patternfile = sys.argv[2]
+patternfile = patternfile+"."+pi
+
 tmatchidx = sys.argv[3]
 out = sys.stdout
 
-pblocksize=-1
-if len(sys.argv) > 4:
-  pblocksize = sys.argv[4]
-  pi = sys.argv[5]
-  pblocksize = int(pblocksize)
-  pi = int(pi)
 
 #  out = open(outfile,'w')
 
 pfile = open(patternfile,'r')
-allPatterns = []
+patterns = []
 ratios = []
 for line in pfile:
   if match('#',line):
@@ -55,23 +61,11 @@ for line in pfile:
   else:
     F = line.split()
     if len(F) > 1:
-      allPatterns += [F[0]]
+      patterns += [F[0]]
       ratios += [F[-1]]
     else:
-      allPatterns += [line.rstrip('\n').lower()]
+      patterns += [line.rstrip('\n').lower()]
       ratios += [1]
-
-print allPatterns,"!"
-
-# limit patterns to pi'th set of pblocksize
-if pblocksize != -1:
-  pstart = pblocksize * pi
-  pend = pstart + pblocksize
-  if pstart >= len(allPatterns): sys.exit(1)
-  elif pend >= len(allPatterns): pend = len(allPatterns)-1 
-  patterns = allPatterns[pstart:pend]
-
-print >>sys.stderr, "indexing ", len(patterns), " of ",len(allPatterns)
 
       
 #    print patterns
