@@ -50,8 +50,13 @@ backgrounds = ['./idx/Anopheles-gambiae-PEST_CHROMOSOMES_AgamP4.3000.IDX.hdf5',
 
 idxfile = sys.argv[1]
 patternfile = sys.argv[2]
+out_prefix = sys.argv[3]
 
-out = sys.stdout
+#out = sys.stdout
+#put proper argparser into this script asap
+
+wig = open(out_prefix+".wig",'w')
+out = open(out_prefix+".tab.txt",'w')
 
 #if len(sys.argv) > 3:
 #  outfile = sys.argv[3]
@@ -60,16 +65,31 @@ out = sys.stdout
 
 pfile = open(patternfile,'r')
 patterns = []
+patternset = []
+pi = -1
 for line in pfile:
   if match('#',line):
     next
   else:
     F = line.split()
     if len(F) > 1:
-      patterns += [F[0]]
+      if not match('[actgACTG,]',F[0]):        
+        pi += 1
+        allPatterns = F[-1]
+        patterns = allPatterns.split(',')
+        print >> sys.stderr, pi
+        patternset.append( patterns)
+#        print patternset
+#        break
+      else:
+        patterns += [F[0]]
     else:
       patterns += [line.rstrip('\n').lower()]
-    print patterns
+if pi == -1:
+  patternset[0] = [patterns]
+#print patternset
+
+#sys.exit(1)
 
 #patterns = ['nnnnn'] + patterns
 #guess chrname and blocksize from indexname
@@ -81,10 +101,10 @@ blocksize = int(blocksize)
 
 index = h5.File(idxfile+".IDX.hdf5", "r")
 
-if len(sys.argv) > 3:
-  chrs = sys.argv[3:]
-else:
-  chrs = index.keys()
+#if len(sys.argv) > 3:
+#  chrs = sys.argv[3:]
+#else:
+chrs = index.keys()
 
 
 
@@ -94,24 +114,48 @@ else:
 #  b_bwts = index["subset/bwt"]
 #  for p in patterns:
 #    
-  
-for chr in chrs:
-  chr_index = index[chr+"/idx"]
-  chr_bwts = index[chr+"/bwt"]
 
-  print >> sys.stderr, fasta, blocksize, chr
-  blocks = chr_index.shape[0]
+pset = 0
+for patterns in patternset:
+  pset += 1
+  wig = open(out_prefix+"."+str(pset)+".wig",'w')
+  out = open(out_prefix+"."+str(pset)+".tab.txt",'w')
 
+  uncovered = 0
+  allBlocks = 0
+  ptottot = 0
+  for chr in chrs:
+    chr_index = index[chr+"/idx"]
+    chr_bwts = index[chr+"/bwt"]
+
+    print >> sys.stderr, fasta, blocksize, chr
+    blocks = chr_index.shape[0]
+    
 #sys.exit(1)
 
-  for n in range(0,blocks):
-    baseRanks = chr_index[n]
-    bwt_line = chr_bwts[n]
+    print >> wig, "fixedStep chrom="+chr+" start=1 step="+str(blocksize)+" span="+str(blocksize)
+
+    for n in range(0,blocks):
+      allBlocks += 1 
+      baseRanks = chr_index[n]
+      bwt_line = chr_bwts[n]
   
   #get mapping of each base to range of posns in first column 
   #(all contiguous as col is sorted)
-    firstColMap = firstColNP(baseRanks[-1])
-    print >> out, chr, n*blocksize, (n+1)*blocksize, blocksize,
-    for p in patterns:
-      print >> out, countMatchesNP(baseRanks,firstColMap,p),
-    print >> out, ""
+      firstColMap = firstColNP(baseRanks[-1])
+      print >> out, chr, n*blocksize, (n+1)*blocksize, blocksize,
+      ptot = 0
+      for p in patterns:
+        pCount =  countMatchesNP(baseRanks,firstColMap,p)
+        ptot += pCount
+        print >> out, pCount,
+      print >> out, ""
+    
+      print >> wig, str(ptot)
+      if(ptot == 0): uncovered += 1
+      ptottot += ptot
+  wig.close()
+  out.close()
+  print >>sys.stderr, "total blocks ("+str(blocksize)+"):"+str(allBlocks)
+  print >>sys.stderr, "mean cov:"+str((ptottot / allBlocks))
+  print >>sys.stderr, "unfilled:"+str(uncovered)

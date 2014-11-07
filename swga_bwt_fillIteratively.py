@@ -19,7 +19,7 @@ import pickle as pkl
 import os
 import swga_bwt as s
 import argparse
-from sklearn.decomposition import PCA
+#from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 
 
@@ -60,10 +60,14 @@ bestN = args.bestN
 forwardWeight = args.forwardWeight
 outfile = args.out
 
-
 k = args.plexSize
 minRatio = args.minRatio # 10
 minCount = args.minCount # 10
+
+if minRatio % 1 == 0:
+  outfile = outfile+"_k"+str(k)+"_r"+str(int(minRatio))+"_c"+str(minCount)
+else:
+  outfile = outfile+"_k"+str(k)+"_r"+str(minRatio)+"_c"+str(minCount)
 
 
 matchcounts = None
@@ -78,103 +82,207 @@ matchcounts = matchcountsHDF5['matchcounts']
 blockPosns = matchcountsHDF5['blockposns']
 blockchrs = matchcountsHDF5['blockchrs']
 patterns = matchcountsHDF5['patterns']
-ratios = matchcountsHDF5['ratios']
+ratios = np.array(matchcountsHDF5['ratios'])
 emptyBlocks = np.array([True] * allBlocks)
 
-#filled = np.greater(matchcounts[:,:20],[0])
 filled = np.greater(matchcounts[:,:],[0])
 sdcols = np.std(matchcounts,axis=0)
+
+passFilters = []
+
 print >>sys.stderr, filled.shape, ratios.shape, sdcols.shape
 
-passRatio = np.greater_equal(ratios, [minRatio])
-failRatio = np.less(ratios, [minRatio])
-filled[:,failRatio] = False #remove those which are too low ratio
+logfile = open(outfile+".log",'w')
 
-patternCounts = np.array(matchcounts).sum(axis=0)
-passCount = np.greater_equal(patternCounts, [minCount])
-failCount = np.less(patternCounts, [minCount])
-filled[:,failCount] = False #remove those which are too low count
+# internal method to reset matrix - assumes filled/matchcounts/etc already there
+# returns matrix like filled but with unfillable blocks set to false 
+# and already filled blocks set to false
+def _setMatrix(minRatio, minCount, plex):
+  global passFilters
 
-
-#filledTot = filled.sum(axis=0)
-
-filledPlex = np.zeros((allBlocks,),dtype=bool)
-
-#internal method to reset matrix - assumes filled/matchcounts/etc already there
-def _setMatrix(passRatio, passCount, plex):
-  print >>sys.stderr, "resetting filled matrix"
+#  print >>sys.stderr, "resetting filled matrix"
   testFilled = np.copy(filled)
 
   passRatio = np.greater_equal(ratios, [minRatio])
   failRatio = np.less(ratios, [minRatio])
+#  print "failRatio:",sum(failRatio)
   testFilled[:,failRatio] = False #remove those which are too low ratio
 
   patternCounts = np.array(matchcounts).sum(axis=0)
   passCount = np.greater_equal(patternCounts, [minCount])
   failCount = np.less(patternCounts, [minCount])
   testFilled[:,failCount] = False #remove those which are too low count
+#  print "failCount:",sum(failCount)
 
-  filledPlex = np.zeros((allBlocks,),dtype=bool)
+  passFilters = np.vstack([passRatio,passCount]).all(axis=0)
+#  print "passFilters:",sum(passFilters)
+
   indices = [p[-1] for p in plex]
-#    print >> sys.stderr, indices
   if (len(indices) > 0):
+    #print >> sys.stderr, indices
     testFilled[:,np.array(indices)] = 0
+  #print >>sys.stderr, minRatio, minCount, plex, sum(sum(testFilled))
   return testFilled
 
-testFilled = _setMatrix(passRatio, passCount, [])
-
-plex=[]
-pi = 0
-while pi < k:
-  filledTot = testFilled.sum(axis=0)
-  nextBestI = filledTot.argsort()[-1]
+def _getBestN(testFilled, filledPlex, k, reset=True):
+#  global filledBlocksPotential
+  plex = []
+  pi = 0
+  while pi < k:
+    filledTot = testFilled.sum(axis=0)
+    nextBestI = filledTot.argsort()[-1]
 #  filledPlex
 #  filled[:,nextBestI]
-  filledPlex[testFilled[:,nextBestI]] = True
-  print pi, sum(filledPlex), sum(sum(testFilled)), patternCounts[nextBestI], patterns[nextBestI]
+    # set newly filled to true in 'filled' array
+    filledPlex[testFilled[:,nextBestI]] = True
+    filledBlocksPotential =  _getTotalFills(passFilters,filled)
+    filledBlocksPrimer = _getTotalFills([nextBestI],filled)
+    testFilled[filledPlex,:] = False
+    plex.append(
+      (patterns[nextBestI],
+       ratios[nextBestI],
+       patternCounts[nextBestI],
+       filledBlocksPrimer,
+       filledBlocksPotential,
+       nextBestI))
+    pi += 1
+    
+    filledBlocksPlex = _getTotalFills([p[-1] for p in plex],filled)
 
+    print pi, str(filledBlocksPlex),"/",str(filledBlocksPotential),"/",str(allBlocks), 
+    print patternCounts[nextBestI], patterns[nextBestI]
+
+    if filledBlocksPlex == filledBlocksPotential:
+      print >>sys.stderr, "no more fillable gaps"
+      filledPlex = np.zeros((allBlocks,),dtype=bool) 
+      testFilled = _setMatrix(minRatio, minCount, plex)
+#    print >>sys.stderr, sum(filledPlex), allBlocks
+  return plex
+
+def _getTotalFills(plex, thisFilled):
+#  plexi = np.array([p[-1] for p in plex])
+#  print >>sys.stderr, plex
+  plexi = np.array(plex)
+  filled = sum(thisFilled[:,plexi].any(axis=1))
+  return filled
+
+
+#get 1D array of 'is block filled' (all false)
+filledPlex = np.zeros((allBlocks,),dtype=bool) 
+
+testFilled = _setMatrix(minRatio, minCount, [])
+patternCounts = np.array(matchcounts).sum(axis=0)
+
+#get optimal probes:
+filledBlocksPotential = _getTotalFills(passFilters,filled)
+
+plex=_getBestN(testFilled,filledPlex,k)
+
+filledPlexCount = _getTotalFills([p[-1] for p in plex],filled)
+plexRatios = ratios[np.array([p[-1] for p in plex])]
+meanRatioOpt = plexRatios[np.isfinite(plexRatios)].mean()
+
+print >>logfile, outfile, filledBlocksPotential, filledPlexCount, (allBlocks - filledPlexCount), meanRatioOpt, 
+
+
+#get suboptimal probes
+maxn = 5
+decrementRatio = minRatio/maxn
+decrementCount = minCount/maxn
+subopt = []
+n = 1
+#reset filled matrix to remove already-chosen probes
+testFilled = _setMatrix((minRatio - n*decrementRatio), 
+                          (minCount - n*decrementCount), 
+                          plex)
+
+#print >>sys.stderr, sum(filledPlex), allBlocks
+while _getTotalFills([p[-1] for p in (plex + subopt)],filled) < allBlocks:
+  suboptRatio = (minRatio - n*decrementRatio)
+  suboptCount = (minCount - n*decrementCount)
+  print >>sys.stderr, "getting suboptimal probes r",suboptRatio," c",suboptCount
+  print sum(sum(testFilled)), "->",
   testFilled[filledPlex,:] = False
-  plex.append(
-    (patterns[nextBestI],ratios[nextBestI],sum(filled[:,nextBestI]),patternCounts[nextBestI],nextBestI))
-  pi += 1
-  if sum(sum(testFilled))==0:
-#    print >>sys.stderr, "resetting filled matrix"
-#    testFilled = np.copy(filled)
-#    filledPlex = np.zeros((allBlocks,),dtype=bool)
-#    indices = [p[-1] for p in plex]
-#    print >> sys.stderr, indices
-#    testFilled[:,np.array(indices)] = 0
-    testFilled = _setMatrix(passRatio, passCount, plex)
+  print sum(sum(testFilled))
+  suboptNew=_getBestN(testFilled,filledPlex,5,reset=False)
+  #print "plex", plex
+  #print "subopt", subopt
+  subopt = list(set(subopt + suboptNew))
+  n += 1
+  
+  pIs = _getTotalFills([p[-1] for p in (plex + subopt)],filled)
+#  coverageComb = _getTotalFills(pIs,filled)
+  if n > maxn: break  
+#  else if coverageComb == allBlocks: break
+  else: 
+    testFilled = _setMatrix((minRatio - n*decrementRatio), 
+                          (minCount - n*decrementCount), 
+                          plex + subopt)
 
-for p in plex:
-  pattern, ratio, coverage, total, index = p
-  print pattern, ratio, coverage, total, index
+print >>logfile, len(subopt)  
+logfile.close()
 
+#######
+# print and collate results
+#######
+
+if 1==0:
+  print >>sys.stdout,"#optimal"
+  for p in plex:
+    pattern, ratio, count, coverage, total, index = p
+    print pattern, ratio, count, coverage, total, index
+
+  print >>sys.stdout,"#suboptimal"
+  for p in subopt:
+    pattern, ratio, count, coverage, total, index = p
+    print pattern, ratio, count, coverage, total, index
+
+
+
+
+
+######
+# order and print primers
+######
 
 indices = [p[-1] for p in plex]
 patterns = [p[0] for p in plex]
-#print >>sys.stderr, indices
-#reindex = np.argsort(indices)
-print >>sys.stderr, allBlocks
-#indices.sort()
-
-#patterns = [patterns[i] for i in reindex]
 indices = np.array(indices)
-#plexMatch = matchcounts[:,indices]
+
 plexMatch = np.zeros((allBlocks,len(indices)))
 pi=0
-for i in indices:
-  print matchcounts[:,i]
+for i in indices: # fill primers in order they were picked
   plexMatch[:,pi] = matchcounts[:,i]
   pi += 1
-#plexMatch = plexMatch.astype(int)
-#outfile = outfile+".k"+str(k)+".r"+str(minRatio)+".tab.txt"
-#posMatrix = np.hstack((blockchrs[:,1],blockPosns))
-#print posMatrix.shape, plexMatch.shape
-outMatrix = np.hstack((blockPosns,plexMatch))
-if minRatio % 1 == 0: minRatio = int(minRatio)
 
-outfileVars = outfile+"_k"+str(k)+"_r"+str(minRatio)+"_c"+str(minCount)
-np.savetxt(outfileVars+".tab.txt", outMatrix, fmt='%s')
-np.savetxt(outfileVars+".chrs", blockchrs, fmt='%s')
-np.savetxt(outfileVars+".plex", patterns, fmt='%s')
+outMatrix = np.hstack((blockPosns,plexMatch))
+
+
+np.savetxt(outfile+".tab.txt", outMatrix, fmt='%s')
+np.savetxt(outfile+".chrs", blockchrs, fmt='%s')
+np.savetxt(outfile+".plex", patterns, fmt='%s')
+
+# print out subopt matrices
+indices = [p[-1] for p in subopt]
+subPatterns = [p[0] for p in subopt]
+indices = np.array(indices)
+
+subPlexMatch = np.zeros((allBlocks,len(indices)))
+pi=0
+for i in indices: # fill primers in order they were picked
+  subPlexMatch[:,pi] = matchcounts[:,i]
+  pi += 1
+
+subOutMatrix = np.hstack((blockPosns,subPlexMatch))
+
+np.savetxt(outfile+".sub.tab.txt", subOutMatrix, fmt='%s')
+np.savetxt(outfile+".sub.chrs", blockchrs, fmt='%s')
+np.savetxt(outfile+".sub.plex", subPatterns, fmt='%s')
+
+
+combOutMatrix = np.hstack((blockPosns,plexMatch,subPlexMatch))
+combPatterns = patterns + subPatterns
+
+np.savetxt(outfile+".comb.tab.txt", combOutMatrix, fmt='%s')
+np.savetxt(outfile+".comb.chrs", blockchrs, fmt='%s')
+np.savetxt(outfile+".comb.plex", combPatterns, fmt='%s')

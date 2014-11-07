@@ -16,7 +16,7 @@ from re import match
 import profile
 import itertools
 import pickle as pkl
-
+import os
 import swga_bwt as s
 import argparse
 
@@ -37,8 +37,9 @@ parser.add_argument('-A|--array', action="store_true", dest='farm', help='run on
 parser.add_argument('-c|--combs', action="store", dest='nCombs', default=1000, type=int, help='number of combinations to assess', nargs='?')
 parser.add_argument('-n|--bestN', action="store", dest='bestN', default=100, type=int, help='show best N combinations', nargs='?')
 parser.add_argument('-k|--plexSize', action="store", dest='plexSize', default=20, type=int, help='size of combinations to select', nargs='?')
-parser.add_argument('-r|--minRatio', action="store", dest='minRatio', default=0, type=float, help='only include primers with higher than /r/ ratio in the plex', nargs='?')
+parser.add_argument('-r|--minRatio', action="store", dest='minRatio', default=10, type=float, help='only include primers with higher than /r/ ratio in the plex', nargs='?')
 parser.add_argument('-M|--noMaxPlex', action="store_false", dest='getMaxPlex', help='calculate max plex? (probably not worth doing on huge datasets')
+parser.add_argument('-F|--forwardWeight', action="store", dest='forwardWeight', type=int, default = 4, help='weighting towards first primers (higher human/plasmo frequencies')
 
 args = parser.parse_args()
 
@@ -52,6 +53,8 @@ tmatchidx = args.tmatchidx[0]
 getMaxPlex = args.getMaxPlex
 nCombs = args.nCombs
 bestN = args.bestN
+forwardWeight = args.forwardWeight
+outfile = args.out
 
 
 k = args.plexSize
@@ -63,11 +66,13 @@ minRatio = args.minRatio # 10
 if args.farm is True:
   pi = os.getenv("LSB_JOBINDEX")
   if pi == None:
-    sys.exit(100,"pi = none - did you mean to submit an array job?")
+    print >>sys.stderr, "pi = none - did you mean to submit an array job?"
+    sys.exit(100)
   patternfile = patternfile+"."+pi
+  if outfile != None:
+    outfile = outfile+"."+pi
 
-out = args.out
-if out == None:
+if outfile == None:
   out = sys.stdout
 else:
   out = open(outfile,'w')
@@ -273,7 +278,13 @@ print >> sys.stderr, noCombs, " total combinations of ",k," in ",n," elements"
 #len(plex)
 
 #make normal probability distribution from first in pattern to last
-mu, sigma = 0.0, 0.1 # mean and sd
+
+mu = 0.0 # mean for prob distribution (must be zero)
+forwardWeighting = (10**forwardWeight) / 10
+sigma = 1.0/int(forwardWeighting)
+print forwardWeight, forwardWeighting, sigma
+ # sd for prob distribution - lower sigma = more dominance of earlier plexes (i.e. higher ratio probes)
+
 probs = np.sort(abs(np.random.normal(loc=mu, scale=sigma, size=len(plex))))[::-1]
 probs = probs/sum(probs)
 
@@ -294,10 +305,10 @@ while i <= nCombs:
 #  print sum(filledRow), sum(filledRowSum)
   sdcomb = sdcols[np.array(comb)]
 
-  print >>sys.stderr, np.array(comb)
+#  print >>sys.stderr, np.array(comb)
   
-  meanratio = np.mean(ratios[np.array(comb)])
-  
+#  meanratio = np.mean(ratios[np.array(comb)])
+  meanratio = np.mean(np.ma.masked_invalid(ratios[np.array(comb)]))
   if 0 == 1:
     print "filled[:,comb]"
     profile.run("filled[:,comb]")
@@ -320,13 +331,15 @@ bestorder = sorted(ranks.keys(), key=lambda a: a[0:2])
 i = 0;
 for key in bestorder:
   i +=1
-  print key
-  plex, something, somethingelse = ranks[key]
-  
-  print "ranks ", ranks[key]
-  print "key", key
-  print "plex ", plex
-  print "\t".join(list(key)) + "\t",
-  print join(patterns[plex])
+#  print key
+  plex, unfilled, meanratio = ranks[key]
+  ufblock, rblock, sd, index = key
+
+#  print "ranks ", ranks[key]
+#  print "key", key
+#  print "plex ", plex
+  print >>out, "\t".join([str(unfilled), str(sd), str(meanratio)]) + "\t",
+  print >>out, np.array_str(plex),
+  print >>out, ",".join(patterns[plex])
   if i == bestN: break
 sys.exit(0)
