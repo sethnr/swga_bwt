@@ -44,6 +44,8 @@ parser.add_argument('-r|--minRatio', action="store", dest='minRatio', default=10
 parser.add_argument('-M|--noMaxPlex', action="store_false", dest='getMaxPlex', help='calculate max plex? (probably not worth doing on huge datasets')
 parser.add_argument('-F|--forwardWeight', action="store", dest='forwardWeight', type=int, default = 4, help='weighting towards first primers (higher human/plasmo frequencies')
 parser.add_argument('-C|--minCount', action="store", dest='minCount', default=100, type=int, help='only include primers with higher than /C/ counts in the target genome', nargs='?')
+parser.add_argument('-D|--decSteps', action="store", dest='decs', default=5, type=int, help='decrease count and ratio by 1/D for d steps when chosing suboptimal probes', nargs='?')
+
 
 args = parser.parse_args()
 
@@ -57,6 +59,7 @@ tmatchidx = args.tmatchidx[0]
 getMaxPlex = args.getMaxPlex
 nCombs = args.nCombs
 bestN = args.bestN
+decs = args.decs
 forwardWeight = args.forwardWeight
 outfile = args.out
 
@@ -65,9 +68,9 @@ minRatio = args.minRatio # 10
 minCount = args.minCount # 10
 
 if minRatio % 1 == 0:
-  outfile = outfile+"_k"+str(k)+"_r"+str(int(minRatio))+"_c"+str(minCount)
+  outfile = outfile+"_k"+str(k)+"_r"+str(int(minRatio))+"_c"+str(minCount)+"_d"+str(decs)
 else:
-  outfile = outfile+"_k"+str(k)+"_r"+str(minRatio)+"_c"+str(minCount)
+  outfile = outfile+"_k"+str(k)+"_r"+str(minRatio)+"_c"+str(minCount)+"_d"+str(decs)
 
 
 matchcounts = None
@@ -120,7 +123,7 @@ def _setMatrix(minRatio, minCount, plex):
   indices = [p[-1] for p in plex]
   if (len(indices) > 0):
     #print >> sys.stderr, indices
-    testFilled[:,np.array(indices)] = 0
+    testFilled[:,np.array(indices)] = False
   #print >>sys.stderr, minRatio, minCount, plex, sum(sum(testFilled))
   return testFilled
 
@@ -134,29 +137,37 @@ def _getBestN(testFilled, filledPlex, k, reset=True):
 #  filledPlex
 #  filled[:,nextBestI]
     # set newly filled to true in 'filled' array
-    filledPlex[testFilled[:,nextBestI]] = True
+    filledPlex[filled[:,nextBestI]] = True
     filledBlocksPotential =  _getTotalFills(passFilters,filled)
+
     filledBlocksPrimer = _getTotalFills([nextBestI],filled)
+    #blank out array from blocks yet to fill, then calc how many are left
     testFilled[filledPlex,:] = False
-    plex.append(
-      (patterns[nextBestI],
+    filledBlocksRemain =  _getTotalFills(passFilters,testFilled)
+    #add new line to plex
+    pLine = (patterns[nextBestI],
        ratios[nextBestI],
        patternCounts[nextBestI],
        filledBlocksPrimer,
        filledBlocksPotential,
-       nextBestI))
+       nextBestI)
+    plex.append(pLine)
     pi += 1
     
     filledBlocksPlex = _getTotalFills([p[-1] for p in plex],filled)
 
-    print pi, str(filledBlocksPlex),"/",str(filledBlocksPotential),"/",str(allBlocks), 
+    print pi, str(filledBlocksPlex)+"/"+str(filledBlocksRemain), str(filledBlocksPotential)+"/"+str(allBlocks), 
     print patternCounts[nextBestI], patterns[nextBestI]
-
-    if filledBlocksPlex == filledBlocksPotential:
+#    print filledBlocksPlex, sum(filledPlex), filledPlex.shape
+#    if sum(filledPlex) == filledBlocksPotential:
+    if filledBlocksRemain == 0:
       print >>sys.stderr, "no more fillable gaps"
-      filledPlex = np.zeros((allBlocks,),dtype=bool) 
-      testFilled = _setMatrix(minRatio, minCount, plex)
+      if reset:
+        filledPlex = np.zeros((allBlocks,),dtype=bool) 
+        testFilled = _setMatrix(minRatio, minCount, plex)
 #    print >>sys.stderr, sum(filledPlex), allBlocks
+      else:
+        return plex
   return plex
 
 def _getTotalFills(plex, thisFilled):
@@ -186,9 +197,9 @@ print >>logfile, outfile, filledBlocksPotential, filledPlexCount, (allBlocks - f
 
 
 #get suboptimal probes
-maxn = 5
-decrementRatio = minRatio/maxn
-decrementCount = minCount/maxn
+
+decrementRatio = minRatio/decs
+decrementCount = float(minCount)/decs
 subopt = []
 n = 1
 #reset filled matrix to remove already-chosen probes
@@ -208,11 +219,11 @@ while _getTotalFills([p[-1] for p in (plex + subopt)],filled) < allBlocks:
   #print "plex", plex
   #print "subopt", subopt
   subopt = list(set(subopt + suboptNew))
-  n += 1
+#  n += 1
   
-  pIs = _getTotalFills([p[-1] for p in (plex + subopt)],filled)
+#  totalCoverage = _getTotalFills([p[-1] for p in (plex + subopt)],filled)
 #  coverageComb = _getTotalFills(pIs,filled)
-  if n > maxn: break  
+  if n < decs: n +=1
 #  else if coverageComb == allBlocks: break
   else: 
     testFilled = _setMatrix((minRatio - n*decrementRatio), 
@@ -260,7 +271,8 @@ outMatrix = np.hstack((blockPosns,plexMatch))
 
 np.savetxt(outfile+".tab.txt", outMatrix, fmt='%s')
 np.savetxt(outfile+".chrs", blockchrs, fmt='%s')
-np.savetxt(outfile+".plex", patterns, fmt='%s')
+#np.savetxt(outfile+".plex", patterns, fmt='%s')
+np.savetxt(outfile+".plex", plex, fmt='%s')
 
 # print out subopt matrices
 indices = [p[-1] for p in subopt]
@@ -277,12 +289,15 @@ subOutMatrix = np.hstack((blockPosns,subPlexMatch))
 
 np.savetxt(outfile+".sub.tab.txt", subOutMatrix, fmt='%s')
 np.savetxt(outfile+".sub.chrs", blockchrs, fmt='%s')
-np.savetxt(outfile+".sub.plex", subPatterns, fmt='%s')
+#np.savetxt(outfile+".sub.plex", subPatterns, fmt='%s')
+np.savetxt(outfile+".sub.plex", subopt, fmt='%s')
 
 
 combOutMatrix = np.hstack((blockPosns,plexMatch,subPlexMatch))
 combPatterns = patterns + subPatterns
+combPlex = plex + subopt
 
 np.savetxt(outfile+".comb.tab.txt", combOutMatrix, fmt='%s')
 np.savetxt(outfile+".comb.chrs", blockchrs, fmt='%s')
-np.savetxt(outfile+".comb.plex", combPatterns, fmt='%s')
+#np.savetxt(outfile+".comb.plex", combPatterns, fmt='%s')
+np.savetxt(outfile+".comb.plex", combPlex, fmt='%s')
