@@ -11,27 +11,48 @@ import os.path as path
 import gzip
 from re import findall
 #import profile
+import argparse
+
+
+parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
+parser.add_argument('-t|--target', action="store", dest='idxfile', type=str, help='target genome index', nargs='?')
+parser.add_argument('-b|--backgrounds', action="store", dest='backgrounds', type=str, help='list of patterns', nargs='+')
+parser.add_argument('-f|--fasta', action="store", dest='fasta', type=str, help='target genome fasta', nargs='?')
+parser.add_argument('-p|--patterns', action="store", dest='patternfile', type=str, help='list of patterns', nargs='?')
+parser.add_argument('-A|--array', action="store_true", dest='farm', help='run on farm? i.e. use LSB_JOBINDEX')
+
+parser.add_argument('-n|--minLength', action="store", dest='lower_len', default=8, type=int, help='lower size limit', nargs='?')
+parser.add_argument('-x|--maxLength', action="store", dest='upper_len', default=12, type=int, help='lower size limit', nargs='?')
+parser.add_argument('-c|--maxTm', action="store", dest='tm_limit', default=30, type=int, help='only include primers withlower than \'c\' melting temperature in the plex (c)', nargs='?')
+
+parser.add_argument('-r|--minRatio', action="store", dest='minRatio', default=10, type=float, help='only include primers with higher than /r/ ratio in the plex', nargs='?')
+
+parser.add_argument('--lengthFilter', action="store", dest='filterLength', default=False, type=boolean, help='filter primers for those contained within another (prioritise longer)', nargs='?')
+
+args = parser.parse_args()
+
+farm = args.farm
+
+
 
 bases = ['a','c','t','g']
-#print itertools.permutations(bases,8)
 
-#primerLen = 8
-#primers = list(map("".join, product(bases, repeat=primerLen)))
-#print len(primers)
+#tm_limit = 30
+#lower_len=8
+#upper_len=12
 
-tm_limit = 30
-lower_len=8
-upper_len=12
+#target = './idx/Pf3D7_v3.0.01.3000'
+#backgrounds = ['./idx/Anopheles-gambiae-PEST_CHROMOSOMES_AgamP4.0.01.3000',
+#           './idx/Homo_sapiens.GRCh38.dna_sm.primary_assembly.0.001.3000']
+tm_limit = args.tm_limit
+lower_len = args.lower_len
+upper_len = args.upper_len
+target = args.idxfile
+backgrounds = args.backgrounds
 
-target = './idx/Pf3D7_v3.0.01.3000'
-backgrounds = ['./idx/Anopheles-gambiae-PEST_CHROMOSOMES_AgamP4.0.01.3000',
-           './idx/Homo_sapiens.GRCh38.dna_sm.primary_assembly.0.001.3000']
+filterLength=args.filterLength
 
-#idxfile = sys.argv[1]
-#patternfile = sys.argv[2]
-filterLength=False
-
-seqfile = sys.argv[1]
+seqfile = args.fasta
 
 
 def getTM(primer):
