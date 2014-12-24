@@ -4,7 +4,7 @@ import sys
 from Bio import SeqIO
 from Bio.Seq import Seq
 from math import floor,ceil
-from itertools import permutations, product
+from itertools import permutations, product, iter
 import numpy as np
 import h5py as h5
 import os.path as path
@@ -12,7 +12,13 @@ import gzip
 from re import findall
 #import profile
 import argparse
+from swga_bwt import * 
 
+
+def grouper(iterable, n, fillvalue=None):
+    "Collect data into fixed-length chunks or blocks"
+    args = [iter(iterable)] * n
+    return izip_longest(fillvalue=fillvalue, *args)
 
 parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
 parser.add_argument('-t|--target', action="store", dest='idxfile', type=str, help='target genome index', nargs='?')
@@ -29,10 +35,14 @@ parser.add_argument('-r|--minRatio', action="store", dest='minRatio', default=10
 
 parser.add_argument('--lengthFilter', action="store", dest='filterLength', default=False, type=boolean, help='filter primers for those contained within another (prioritise longer)', nargs='?')
 
+parser.add_argument('-o|--out', action="store", dest='outfile', type=str, default="candidates.txt", help='target genome fasta', nargs='?')
+parser.add_argument('-B|--blocksize', action="store", dest='blocksize', default=100, type=int, help='size of blocks for threading', nargs='?')
+parser.add_argument('-T|--threads', action="store", dest='threads', default=100, type=int, help='no of threads', nargs='?')
+
 args = parser.parse_args()
 
 farm = args.farm
-
+outfile = args.outfile
 
 
 bases = ['a','c','t','g']
@@ -55,47 +65,11 @@ filterLength=args.filterLength
 seqfile = args.fasta
 
 
-def getTM(primer):
-    nA = len(findall('a',primer))
-    nC = len(findall('c',primer))
-    nT = len(findall('t',primer))
-    nG = len(findall('g',primer))
-    tm = nA*2+nT*2+nC*4+nG*4
-    #print tm
-    return tm
-
-
-def getIndexCounts(target, backgrounds, patterns):
-  backcounts = {}
-
-  for b in [target] + background:
-    b = +".IDX.hdf5"
-    print b
-    bgindex = h5.File(b,"r")
-    b_index = bgindex["subset/idx"]
-    b_bwts = bgindex["subset/bwt"]
-  #firstColMap = firstColNP(baseRanks[-1])
-    for p in patterns:
-    #print >> out, chr, n*blocksize, (n+1)*blocksize, blocksize,
-      noBlocks = b_bwts.shape[0]
-      noBlocks = 10
-      matches = 0
-      print p,
-      for n in range(0,noBlocks):
-        baseRanks = b_index[n]
-        firstColMap = firstColNP(baseRanks[-1])
-        bwt_line = b_bwts[n]
-        match = countMatchesNP(baseRanks,firstColMap,p)
-        print match,
-        matches += match
-        backcounts[p,b] = float(matches) / float(noBlocks)
-      print ''
-
 
 seq = SeqIO.parse(seqfile,'fasta')
 
 primers = set()
-pcount = {}
+tcount = {}
 genomeLen = 0
 for chr in seq:
     seqstr = str(chr.seq).lower()
@@ -110,10 +84,10 @@ for chr in seq:
                 tm = getTM(primer)
                 if tm <= tm_limit:
                     if primer in primers:
-                        pcount[primer] += 1
+                        tcount[primer] += 1
                     else:
                         primers.add(primer)
-                        pcount[primer] = 1
+                        tcount[primer] = 1
     print len(primers)
 
 
@@ -132,15 +106,67 @@ else:
     primers = primersF
 print len(primers)
 
-out = open("candidates.txt","w")
 
-print >>out, "#primer","total","rpk"
-for primer in primers:
-    print >>out, primer, pcount[primer], (float(pcount[primer]) / genomeLen) * 1000
+out = open(outfile,"w")
+
+#print >>out, "#primer","total","rpk"
+#for primer in primers:
+#    print >>out, primer, tcount[primer], (float(tcount[primer]) / genomeLen) * 1000
+
+
+#def printIndexCountsBlock(primerBlock, outfile):
+#    out = open(outfile,'w')
+#    for primer in block:
+#        backcounts = getIndexCounts(target, background, patterns)
+#        print >>out, primer, tcount[primer], (float(tcount[primer]) / genomeLen) * 1000
+
+
+#use N threads to get counts in backgrounds 
+backcounts = {}
+
+def _getMatchesBlock(newPatterns)
+    global backcounts
+    if(len(newPatterns) > 0):
+        newCounts = getIndexCounts(backgrounds,newPatterns, blockToRPK)
+        backcounts.update(newCounts)
+    
+if threads > 1:
+    primerBlocks = grouper(primers, args.blocksize)
+    parallel(_getMatchesBlock, threads, primerBlocks)
+else:
+    print >>out, "#primer","total","rpk"
+    for primer in primers:
+        print >>out, primer, tcount[primer], (float(tcount[primer]) / genomeLen) * 1000
+
+
+
+        
+for p in primers:
+#  print p, target
+#  tcount = backcounts[p,target+".IDX.hdf5"]
+  tcount = tcounts[p]
+  ratioTotal = 0
+  print >>out, p, tcount, 
+  for b in backgrounds.values():
+    bcount = backcounts[(p,b+".IDX.hdf5")]
+    if bcount > 0: ratio = tcount/bcount
+    else: ratio=float('inf')
+    print >>out, bcount, ratio,
+    ratioTotal += ratio
+  print >>out, ratioTotal / len(backgrounds)
+#  print >>out, ''
+
+        
+#print >> out, "#primer", "t_count",
+#for b in backgrounds.keys():
+#  print >>out, str(b)+"_count", str(b)+"_ratio",
+#print >> out, "mean_ratio"
+
+        
 
 #print >> out, "\n".join(primers)
 
 #backcounts = getIndexCounts(target, background, patterns)
 
-sys.exit(1)
+sys.exit(0)
 

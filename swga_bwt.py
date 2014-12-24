@@ -12,6 +12,17 @@ allBases.sort()
 # nb: ^^ allBases MUST be sorted - next in array must be next in bwt matrix
 
 
+def getTM(primer):
+    nA = len(findall('a',primer))
+    nC = len(findall('c',primer))
+    nT = len(findall('t',primer))
+    nG = len(findall('g',primer))
+    tm = nA*2+nT*2+nC*4+nG*4
+    #print tm
+    return tm
+
+
+
 
 def firstColNP(tots):
   # get ranges of each base in first col (contiguous as BWM is sorted)
