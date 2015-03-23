@@ -6,6 +6,7 @@ import numpy as np
 import h5py as h5
 import os.path as path
 import pickle as pkl
+from re import findall
 
 allBases = ['a','c','g','t','n','$']
 allBases.sort()
@@ -244,3 +245,42 @@ def addMatchCountsHDF5(index, newPatterns, matchcountsHDF5):
 
 #  return matchcounts, blockPosns #, pArray
 #    print >> out, ""
+
+
+########
+# BWT index builder
+########
+
+def suffixArray(s):
+  #get tuples of suffixes + ordering of original rows
+  sa = sorted([(s[i:], i) for i in xrange(0, len(s)+1)])
+  #return just ordering of rows
+  return map(lambda x: x[1], sa)
+
+def bwt(t):
+  #get burrows wheeler transform of string T
+  bw = []
+  for si in suffixArray(t):
+    if si == 0:
+      bw.append('$')
+    else:
+      bw.append(t[si-1])
+  return ''.join(bw) # return string-ized version of list bw
+
+
+def rankAllBwtNP(bw):
+  # returns an ndarray of size (seq_length * no_different_bases) 
+  # containing cumulative nos of occurences of base n
+  tots_i = np.array([0]*len(allBases))
+  i = 0;
+  baseRanks = np.zeros(shape=(len(bw),len(allBases)),dtype='int')
+
+  for c in bw:
+      c = c.lower()      
+      if c not in allBases:
+          c = 'n'
+      nc = allBases.index(c)
+      tots_i[nc] += 1
+      baseRanks[i] = tots_i
+      i +=1
+  return baseRanks

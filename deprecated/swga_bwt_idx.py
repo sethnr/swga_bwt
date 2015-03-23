@@ -8,45 +8,29 @@ import numpy as np
 import h5py as h5
 import os.path as path
 #import profile
+import swga_bwt as s
 
 
 allBases = ['a','c','g','t','n','$']
 allBases.sort()
 # nb: ^^ allBases MUST be sorted - next in array must be next in bwt matrix
 
-def suffixArray(s):
-  #get tuples of suffixes + ordering of original rows
-  sa = sorted([(s[i:], i) for i in xrange(0, len(s)+1)])
-  #return just ordering of rows
-  return map(lambda x: x[1], sa)
+########
+# get some vars
+########
+parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
+parser.add_argument('-t','--target', action="store", dest='idxfile', type=str, help='target genome index', nargs='?')
+parser.add_argument('-b','--background', action="store", dest='tmatchidx', type=str, help='match positions index', nargs='+')
+parser.add_argument('-o','--out', action="store", dest='out', type=str, help='outfile', nargs='?')
+parser.add_argument('-p','--background_percent', action="store", dest='bpc', type=int, help='outfile', default=10, nargs='?')
 
-def bwt(t):
-  #get burrows wheeler transform of string T
-  bw = []
-  for si in suffixArray(t):
-    if si == 0:
-      bw.append('$')
-    else:
-      bw.append(t[si-1])
-  return ''.join(bw) # return string-ized version of list bw
+args = parser.parse_args()
 
 
-def rankAllBwtNP(bw):
-  # returns an ndarray of size (seq_length * no_different_bases) 
-  # containing cumulative nos of occurences of base n
-  tots_i = np.array([0]*len(allBases))
-  i = 0;
-  baseRanks = np.zeros(shape=(len(bw),len(allBases)),dtype='int')
+percent = args.bpc/100
+fasta = args.target
 
-  for c in bw:
-      c = c.lower()      
-      if c not in allBases:
-          c = 'n'
-      nc = allBases.index(c)
-      tots_i[nc] += 1
-      baseRanks[i] = tots_i
-      i +=1
-  return baseRanks
+
 
 #############
 # do some stuff

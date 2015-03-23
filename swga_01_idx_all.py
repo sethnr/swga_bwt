@@ -9,45 +9,30 @@ import h5py as h5
 import os.path as path
 import gzip
 #import profile
-
+import swga_bwt as s
+import argparse
 
 allBases = ['a','c','g','t','n','$']
 allBases.sort()
 # nb: ^^ allBases MUST be sorted - next in array must be next in bwt matrix
 
-def suffixArray(s):
-  #get tuples of suffixes + ordering of original rows
-  sa = sorted([(s[i:], i) for i in xrange(0, len(s)+1)])
-  #return just ordering of rows
-  return map(lambda x: x[1], sa)
+########
+# get some vars
+########
+parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
+parser.add_argument('-f','--fasta', action="store", dest='fasta', type=str, help='target genome to index (fasta)', nargs='?')
+parser.add_argument('-o','--out', action="store", dest='out', type=str, help='outfile', nargs='?')
+parser.add_argument('-I','--idxdir', action="store", dest='idxdir', type=str, help='directory for indices', nargs='?', default="./idx/")
+parser.add_argument('-b','--blocksize', action="store", dest='blocksize', type=int, default=3000, help='block size (kb)', nargs='?')
+parser.add_argument('-p','--background_percent', action="store", dest='bpc', type=float, help='percent of genome to index', default=100, nargs='?')
 
-def bwt(t):
-  #get burrows wheeler transform of string T
-  bw = []
-  for si in suffixArray(t):
-    if si == 0:
-      bw.append('$')
-    else:
-      bw.append(t[si-1])
-  return ''.join(bw) # return string-ized version of list bw
+args = parser.parse_args()
 
 
-def rankAllBwtNP(bw):
-  # returns an ndarray of size (seq_length * no_different_bases) 
-  # containing cumulative nos of occurences of base n
-  tots_i = np.array([0]*len(allBases))
-  i = 0;
-  baseRanks = np.zeros(shape=(len(bw),len(allBases)),dtype='int')
-
-  for c in bw:
-      c = c.lower()      
-      if c not in allBases:
-          c = 'n'
-      nc = allBases.index(c)
-      tots_i[nc] += 1
-      baseRanks[i] = tots_i
-      i +=1
-  return baseRanks
+fasta = args.fasta
+blocksize=args.blocksize
+percent = float(args.bpc)/100
+idxdir = args.idxdir
 
 #############
 # do some stuff
@@ -55,11 +40,11 @@ def rankAllBwtNP(bw):
 
 #blocksize = 5000
 
-fasta = sys.argv[1]
-blocksize = int(sys.argv[2])
-percent = float(sys.argv[3])
+# fasta = sys.argv[1]
+# blocksize = int(sys.argv[2])
+# percent = float(sys.argv[3])
 
-print fasta
+print 1/percent
 
 if fasta[-2:] == "gz": 
   seqfile = gzip.open(fasta)
@@ -72,8 +57,9 @@ idxfile = path.basename(fasta)
 idxfile = idxfile.replace('.fasta','')
 idxfile = idxfile.replace('.fa','')
 idxfile = idxfile.replace('.gz','')
-idxfile = "./idx/"+idxfile+"."+str(percent)+"."+str(blocksize)
+idxfile = idxdir+idxfile+"."+str(percent)+"."+str(blocksize)
 
+print >>sys.stderr, idxfile
 index = h5.File(idxfile+".IDX.hdf5", "a")
 compression = 'gzip'
 
@@ -126,8 +112,11 @@ for chr in seq:
         seqblock = chr.seq[n*blocksize:end]
       
 #    print n, n*blocksize, end, len(seqblock)
-      bwt_line = bwt(str(seqblock.lower()))     
-      baseRanks = rankAllBwtNP(bwt_line)
+      bwt_line = s.bwt(str(seqblock.lower()))     
+
+#      print >>sys.stderr,seqblock.lower(),"\n",bwt_line
+        
+      baseRanks = s.rankAllBwtNP(bwt_line)
       i = int(bi/(1/percent))
       chr_index[i] = baseRanks
       chr_bwts[i] = bwt_line

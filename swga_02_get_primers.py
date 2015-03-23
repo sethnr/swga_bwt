@@ -4,44 +4,45 @@ import sys
 from Bio import SeqIO
 from Bio.Seq import Seq
 from math import floor,ceil
-from itertools import permutations, product, iter
+#from itertools import permutations, product #, iter
+import itertools as it
 import numpy as np
 import h5py as h5
 import os.path as path
 import gzip
-from re import findall
+# from re import findall
 #import profile
 import argparse
 from swga_bwt import * 
-
+from myParallel import *
 
 def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
     args = [iter(iterable)] * n
-    return izip_longest(fillvalue=fillvalue, *args)
+    return it.izip_longest(fillvalue=fillvalue, *args)
 
 parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
-parser.add_argument('-t|--target', action="store", dest='idxfile', type=str, help='target genome index', nargs='?')
-parser.add_argument('-b|--backgrounds', action="store", dest='backgrounds', type=str, help='list of patterns', nargs='+')
-parser.add_argument('-f|--fasta', action="store", dest='fasta', type=str, help='target genome fasta', nargs='?')
-parser.add_argument('-p|--patterns', action="store", dest='patternfile', type=str, help='list of patterns', nargs='?')
-parser.add_argument('-A|--array', action="store_true", dest='farm', help='run on farm? i.e. use LSB_JOBINDEX')
+# parser.add_argument('-t','--target', action="store", dest='idxfile', type=str, help='target genome index', nargs='?')
+parser.add_argument('-b','--background', action="store", dest='backgrounds', type=str, help='background genomes', nargs='+')
+parser.add_argument('-f','-t','--fasta', action="store", dest='fasta', type=str, help='target genome (fasta)', nargs='?')
+# parser.add_argument('-p|--patterns', action="store", dest='patternfile', type=str, help='list of patterns', nargs='?')
+# parser.add_argument('-A|--array', action="store_true", dest='farm', help='run on farm? i.e. use LSB_JOBINDEX')
 
 parser.add_argument('-n|--minLength', action="store", dest='lower_len', default=8, type=int, help='lower size limit', nargs='?')
 parser.add_argument('-x|--maxLength', action="store", dest='upper_len', default=12, type=int, help='lower size limit', nargs='?')
 parser.add_argument('-c|--maxTm', action="store", dest='tm_limit', default=30, type=int, help='only include primers withlower than \'c\' melting temperature in the plex (c)', nargs='?')
 
-parser.add_argument('-r|--minRatio', action="store", dest='minRatio', default=10, type=float, help='only include primers with higher than /r/ ratio in the plex', nargs='?')
+#parser.add_argument('-r|--minRatio', action="store", dest='minRatio', default=10, type=float, help='only include primers with higher than /r/ ratio in the plex', nargs='?')
 
-parser.add_argument('--lengthFilter', action="store", dest='filterLength', default=False, type=boolean, help='filter primers for those contained within another (prioritise longer)', nargs='?')
+parser.add_argument('--lengthFilter', action="store", dest='filterLength', default=False, type=bool, help='filter primers for those contained within another (prioritise longer)', nargs='?')
 
 parser.add_argument('-o|--out', action="store", dest='outfile', type=str, default="candidates.txt", help='target genome fasta', nargs='?')
 parser.add_argument('-B|--blocksize', action="store", dest='blocksize', default=100, type=int, help='size of blocks for threading', nargs='?')
-parser.add_argument('-T|--threads', action="store", dest='threads', default=100, type=int, help='no of threads', nargs='?')
+parser.add_argument('-T|--threads', action="store", dest='threads', default=10, type=int, help='no of threads [4]', nargs='?')
 
 args = parser.parse_args()
 
-farm = args.farm
+#farm = args.farm
 outfile = args.outfile
 
 
@@ -57,13 +58,14 @@ bases = ['a','c','t','g']
 tm_limit = args.tm_limit
 lower_len = args.lower_len
 upper_len = args.upper_len
-target = args.idxfile
+#target = args.idxfile
+threads = args.threads
 backgrounds = args.backgrounds
 
 filterLength=args.filterLength
 
 seqfile = args.fasta
-
+blocksize = args.blocksize
 
 
 seq = SeqIO.parse(seqfile,'fasta')
@@ -124,15 +126,18 @@ out = open(outfile,"w")
 #use N threads to get counts in backgrounds 
 backcounts = {}
 
-def _getMatchesBlock(newPatterns)
+def _getMatchesBlock(newPatterns):
     global backcounts
     if(len(newPatterns) > 0):
         newCounts = getIndexCounts(backgrounds,newPatterns, blockToRPK)
         backcounts.update(newCounts)
     
 if threads > 1:
-    primerBlocks = grouper(primers, args.blocksize)
-    parallel(_getMatchesBlock, threads, primerBlocks)
+    primerBlocks = grouper(primers, blocksize)
+
+    print >>sys.stderr, blocksize, primerBlocks
+    primerBlocksL = list(primerBlocks)
+    parallel(_getMatchesBlock, threads, primerBlocksL)
 else:
     print >>out, "#primer","total","rpk"
     for primer in primers:
@@ -144,7 +149,7 @@ else:
 for p in primers:
 #  print p, target
 #  tcount = backcounts[p,target+".IDX.hdf5"]
-  tcount = tcounts[p]
+  tcount = tcount[p]
   ratioTotal = 0
   print >>out, p, tcount, 
   for b in backgrounds.values():
