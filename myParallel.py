@@ -16,7 +16,7 @@ class doThread (threading.Thread):
         #self.queue = q
         self.FUN = FUN
         self.args = args
-        print >>sys.stderr, args
+        print >>sys.stderr, "threadargs = ",args, "\nlen =",len(args)
         if FUN is None:
             print >> sys.stderr, "cannot run a thread with a null function"
             sys.exit(1)
@@ -35,6 +35,7 @@ class doThread (threading.Thread):
                 queueLock.release()
                 print "%s processing %s\n" % (self.threadID, data)
                 results = self.FUN(data, self.args)
+                print results
             #sleep(5) #if queue empty, wait a second for others to catch up
                 
 class writeThread (threading.Thread):
@@ -52,11 +53,17 @@ def parallel(FUN, noThreads, workArray, *args):
     # global resultsQueue
     global exitFlag
     
-    workQueue = Queue.Queue(len(workArray))
+    workArrayL = list(workArray)
+    print >>sys.stderr,"workarray: ",workArray
+    print >>sys.stderr,"threads: ", noThreads
+    workQueue = Queue.Queue(len(workArrayL))
     resultqueue = Queue.Queue()
     queueLock.acquire()
-    for block in workArray:
-        workQueue.put(block)
+    for block in workArrayL:
+#    while workArray:
+#        block = workArray.next()
+#        print >>sys.stderr, "block = ",block
+        workQueue.put(set(block))
     queueLock.release()
 
     # get threads array - will need it to kill later...

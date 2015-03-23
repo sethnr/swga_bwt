@@ -36,9 +36,9 @@ parser.add_argument('-c|--maxTm', action="store", dest='tm_limit', default=30, t
 
 parser.add_argument('--lengthFilter', action="store", dest='filterLength', default=False, type=bool, help='filter primers for those contained within another (prioritise longer)', nargs='?')
 
-parser.add_argument('-o|--out', action="store", dest='outfile', type=str, default="candidates.txt", help='target genome fasta', nargs='?')
-parser.add_argument('-B|--blocksize', action="store", dest='blocksize', default=100, type=int, help='size of blocks for threading', nargs='?')
-parser.add_argument('-T|--threads', action="store", dest='threads', default=10, type=int, help='no of threads [4]', nargs='?')
+parser.add_argument('-o','--out', action="store", dest='outfile', type=str, default="candidates.txt", help='target genome fasta', nargs='?')
+parser.add_argument('-B','--blocksize', action="store", dest='blocksize', default=100, type=int, help='size of blocks for threading', nargs='?')
+parser.add_argument('-T','--threads', action="store", dest='threads', default=10, type=int, help='no of threads [4]', nargs='?')
 
 args = parser.parse_args()
 
@@ -66,7 +66,7 @@ filterLength=args.filterLength
 
 seqfile = args.fasta
 blocksize = args.blocksize
-
+blockToRPK = float(1000) / blocksize
 
 seq = SeqIO.parse(seqfile,'fasta')
 
@@ -126,8 +126,10 @@ out = open(outfile,"w")
 #use N threads to get counts in backgrounds 
 backcounts = {}
 
-def _getMatchesBlock(newPatterns):
+
+def _getMatchesBlock(newPatterns, *args):
     global backcounts
+    print >>sys.stderr, len(newPatterns)
     if(len(newPatterns) > 0):
         newCounts = getIndexCounts(backgrounds,newPatterns, blockToRPK)
         backcounts.update(newCounts)
@@ -135,9 +137,11 @@ def _getMatchesBlock(newPatterns):
 if threads > 1:
     primerBlocks = grouper(primers, blocksize)
 
-    print >>sys.stderr, blocksize, primerBlocks
-    primerBlocksL = list(primerBlocks)
-    parallel(_getMatchesBlock, threads, primerBlocksL)
+  #  print >>sys.stderr, blocksize, primerBlocks
+  #  primerBlocksL = list(primerBlocks)
+  #  for i in range(1,5):
+  #      print >>sys.stderr, primerBlocksL[i]
+    parallel(_getMatchesBlock, threads, primerBlocks)
 else:
     print >>out, "#primer","total","rpk"
     for primer in primers:
@@ -152,7 +156,8 @@ for p in primers:
   tcount = tcount[p]
   ratioTotal = 0
   print >>out, p, tcount, 
-  for b in backgrounds.values():
+  #for b in backgrounds.values():
+  for b in backgrounds:
     bcount = backcounts[(p,b+".IDX.hdf5")]
     if bcount > 0: ratio = tcount/bcount
     else: ratio=float('inf')

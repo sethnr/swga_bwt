@@ -59,7 +59,8 @@ def getIndexCounts(backgrounds, patterns, blockToRPK):
   #t_bwts = tindex["subset/bwt"]
   
   #for b in [target] + backgrounds.values():
-  for b in backgrounds.values():
+#  for b in backgrounds.values():
+  for b in backgrounds:
     #print b
     b = str(b)+".IDX.hdf5"
     #print b
