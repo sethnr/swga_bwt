@@ -25,9 +25,6 @@ import os
 # do some stuff
 ############
 
-#backgrounds = ['./idx/Anopheles-gambiae-PEST_CHROMOSOMES_AgamP4.3000.IDX.hdf5',
-#           'Homo_sapiens.GRCh38.dna_sm.primary_assembly.3000.IDX.hdf5']
-
 
 if len(sys.argv)==1: 
   print "\n\tpython swga_bwt_build_match_idx.py -t target_index -p pattern_file -i match_index \n\n"
@@ -35,28 +32,29 @@ if len(sys.argv)==1:
 
 
 parser = argparse.ArgumentParser(description='build index of genome matches in 3k blocks')
-parser.add_argument('-t|--target', action="store", dest='idxfile', type=str, help='target genome index', nargs='+')
-parser.add_argument('-p|--patterns', action="store", dest='patternfile', type=str, help='list of patterns', nargs='+')
-parser.add_argument('-i|--tmatchidx', action="store", dest='tmatchidx', type=str, help='match positions index', nargs='+')
-parser.add_argument('-o|--out', action="store", dest='out', type=str, help='outfile', nargs='?')
-parser.add_argument('-A|--array', action="store_true", dest='farm', help='run on farm? i.e. use LSB_JOBINDEX')
+parser.add_argument('-t','--target', action="store", dest='idxfile', type=str, help='target genome index', nargs='?')
+parser.add_argument('-p','--patterns', action="store", dest='patternfile', type=str, help='list of patterns', nargs='?')
+parser.add_argument('-i','--tmatchidx', action="store", dest='tmatchidx', type=str, help='match positions index', nargs='?')
+parser.add_argument('-o','--out', action="store", dest='out', type=str, help='outfile', nargs='?')
+parser.add_argument('-A','--array', action="store_true", dest='farm', help='is this being run on the farm? i.e. use LSB_JOBINDEX')
+parser.add_argument('-I','--init', action="store_true", dest='init', help='initialise matrix (will be done automatically if local)')
 
 args = parser.parse_args()
 
 #pi = os.getenv("LSB_JOBINDEX")
 
 farm = args.farm
-idxfile = args.idxfile[0]
+idxfile = args.idxfile
 idxfile = idxfile.replace(".IDX.hdf5","")
-patternfile = args.patternfile[0]
-tmatchidx = args.tmatchidx[0]
+patternfile = args.patternfile
+tmatchidx = args.tmatchidx
 
 #print >>sys.stderr, args.farm
 
 if args.farm is True:
   pi = os.getenv("LSB_JOBINDEX")
   if pi == None:
-    sys.exit(100,"pi = none - did you mean to submit an array job?")
+    sys.exit(100,"LSB_JOBINDEX = none - did you mean to submit an array job?")
   patternfile = patternfile+"."+pi
 
 out = args.out
@@ -65,17 +63,13 @@ if out == None:
 else:
   out = open(outfile,'w')
 
-
-
-
-#  out = open(outfile,'w')
+  
 
 pfile = open(patternfile,'r')
 patterns = []
 ratios = []
 for line in pfile:
-  if match('#',line):
-    next
+  if match('#',line): next
   else:
     F = line.split()
     if len(F) > 1:
@@ -96,19 +90,26 @@ blocksize = int(blocksize)
 index = h5.File(idxfile+".IDX.hdf5", "r")
 chrs = index.keys()
 
-#initialise index if it doesn't exist
-#if not path.exists(tmatchidx):
-##  tmatchfile = open(tmatchidx,"w")
-#  matchindex = h5.File(tmatchidx, "w")
-##compression = None
-#  compression = 'gzip'
-#  matchindex =  s.initMatchCountsHDF5(index,allPatterns,blocksize,chrs,ratios,matchindex)
-#  print matchindex
-#  matchindex.close()
 
+def _initialiseMatchIDX():
+  matchindex = h5.File(tmatchidx, "w")
+  compression = 'gzip'
+  matchindex =  s.initMatchCountsHDF5(index,patterns,blocksize,chrs,ratios,matchindex)
+  print matchindex
+  matchindex.close()
 
+## initialise match array
+#NB potential race condition with matrix initialisation in farm use
+# therefore initialise only if local job or specific init job
+if not path.exists(tmatchidx):
+    if args.farm is False:
+        _initialiseMatchIDX()
+    elif args.init is True:
+        _initialiseMatchIDX()
+    
 #update index with new patterns
 #tmatchfile = open(tmatchidx,"r")
+# open match file for appending
 matchindex = h5.File(tmatchidx, 'r+')
 s.addMatchCountsHDF5(index, patterns, matchindex)
 matchindex.close()
