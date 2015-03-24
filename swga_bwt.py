@@ -52,7 +52,7 @@ def countMatchesNP(baseRanks, first, p):
 # get counts of no of times each pattern is represented in each background
 def getIndexCounts(backgrounds, patterns, blockToRPK):
   backcounts = {}
-  print backgrounds
+  # print "GETTING IDX COUNTS:",backgrounds, len(patterns), patterns[1]
   #get target
   #tindex = h5.File(str(target)+".IDX.hdf5","r")
   #t_index = tindex["subset/idx"]
@@ -63,7 +63,7 @@ def getIndexCounts(backgrounds, patterns, blockToRPK):
   for b in backgrounds:
     #print b
     b = str(b)+".IDX.hdf5"
-    #print b
+    # print b
     bgindex = h5.File(b,"r")
     b_index = bgindex["subset/idx"]
     b_bwts = bgindex["subset/bwt"]
@@ -74,22 +74,23 @@ def getIndexCounts(backgrounds, patterns, blockToRPK):
     
     for p in patterns:
       i += 1
-      if i % 10 == 0: print >>sys.stderr, i 
-    #print >> out, chr, n*blocksize, (n+1)*blocksize, blocksize,
-#      noBlocks = b_bwts.shape[0]
-      #noBlocks = 10
-      matches = 0
-#      print p,
-      for n in range(0,noBlocks):
-        baseRanks = b_index[n]
-        firstColMap = firstColNP(baseRanks[-1])
-        bwt_line = b_bwts[n]
-        match = countMatchesNP(baseRanks,firstColMap,p)
-#        print match, noBlocks,
-        matches += match
-        backcounts[(p,b)] = (float(matches) / float(noBlocks)) * blockToRPK
-      print '.',
-      #print p, matches, noBlocks
+      if p is not None:
+        if i % 10 == 0: print >>sys.stderr, i 
+      #print >> out, chr, n*blocksize, (n+1)*blocksize, blocksize,
+  #      noBlocks = b_bwts.shape[0]
+        #noBlocks = 10
+        matches = 0
+  #      print "P:",p," Nb:",noBlocks
+        for n in range(0,noBlocks):
+          baseRanks = b_index[n]
+          firstColMap = firstColNP(baseRanks[-1])
+          bwt_line = b_bwts[n]
+          match = countMatchesNP(baseRanks,firstColMap,p)
+  #        print match, noBlocks,
+          matches += match
+          backcounts[(p,b)] = (float(matches) / float(noBlocks)) * blockToRPK
+        print '.',
+        #print p, matches, noBlocks
   return backcounts
 
 

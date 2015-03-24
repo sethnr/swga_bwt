@@ -17,7 +17,7 @@ mkdir ./idx/
   python swga_01_idx_all.py -f agambiae_ref.fasta -b 3000 -p 10
 
 2.1: call primers from target genome (exhaustive)
-  python swga_02_primers.py -t ~/refs/Pf3D7_v3.fasta  -b BACKGROUND1 [-b BACKGROUND2 ]  \
+  python swga_02_get_primers.py -t ~/refs/Pf3D7_v3.fasta  -b BACKGROUND1 [-b BACKGROUND2 ]  \
      -c <MAX_TM> -n <primer min length> -x <primer max length> \
 	 -T <threads [1]>
   #4 threads good, 8 better

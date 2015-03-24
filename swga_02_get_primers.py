@@ -17,7 +17,7 @@ from swga_bwt import *
 from myParallel import *
 
 def grouper(iterable, n, fillvalue=None):
-    "Collect data into fixed-length chunks or blocks"
+    # "Collect data into fixed-length chunks or blocks"
     args = [iter(iterable)] * n
     return it.izip_longest(fillvalue=fillvalue, *args)
 
@@ -37,7 +37,7 @@ parser.add_argument('-c|--maxTm', action="store", dest='tm_limit', default=30, t
 parser.add_argument('--lengthFilter', action="store", dest='filterLength', default=False, type=bool, help='filter primers for those contained within another (prioritise longer)', nargs='?')
 
 parser.add_argument('-o','--out', action="store", dest='outfile', type=str, default="candidates.txt", help='target genome fasta', nargs='?')
-parser.add_argument('-B','--blocksize', action="store", dest='blocksize', default=100, type=int, help='size of blocks for threading', nargs='?')
+parser.add_argument('--chunksize', action="store", dest='blocksize', default=100, type=int, help='size of chunks for threading (assess n primers in each threadblock)', nargs='?')
 parser.add_argument('-T','--threads', action="store", dest='threads', default=10, type=int, help='no of threads [4]', nargs='?')
 
 args = parser.parse_args()
@@ -129,23 +129,19 @@ backcounts = {}
 
 def _getMatchesBlock(newPatterns, *args):
     global backcounts
-    print >>sys.stderr, len(newPatterns)
+#    print >>sys.stderr, len(newPatterns)
     if(len(newPatterns) > 0):
         newCounts = getIndexCounts(backgrounds,newPatterns, blockToRPK)
         backcounts.update(newCounts)
-    
+
+#print >>sys.stderr, primers
+           
 if threads > 1:
     primerBlocks = grouper(primers, blocksize)
-
-<<<<<<< HEAD
-    print >>sys.stderr, blocksize, primerBlocks
-    primerBlocksL = list(primerBlocks)
-=======
   #  print >>sys.stderr, blocksize, primerBlocks
   #  primerBlocksL = list(primerBlocks)
   #  for i in range(1,5):
   #      print >>sys.stderr, primerBlocksL[i]
->>>>>>> 76bf2afd67e968536cb7c15e9602121f98b8cb4d
     parallel(_getMatchesBlock, threads, primerBlocks)
 else:
     print >>out, "#primer","total","rpk"
@@ -153,18 +149,18 @@ else:
         print >>out, primer, tcount[primer], (float(tcount[primer]) / genomeLen) * 1000
 
 
-
+primers = [p for p in list(primers) if p is not None]
         
 for p in primers:
 #  print p, target
 #  tcount = backcounts[p,target+".IDX.hdf5"]
-  tcount = tcount[p]
+  ptcount = tcount[p]
   ratioTotal = 0
-  print >>out, p, tcount, 
+  print >>out, p, ptcount, 
   #for b in backgrounds.values():
   for b in backgrounds:
     bcount = backcounts[(p,b+".IDX.hdf5")]
-    if bcount > 0: ratio = tcount/bcount
+    if bcount > 0: ratio = ptcount/bcount
     else: ratio=float('inf')
     print >>out, bcount, ratio,
     ratioTotal += ratio

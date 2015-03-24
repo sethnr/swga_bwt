@@ -38,6 +38,7 @@ parser.add_argument('-i','--tmatchidx', action="store", dest='tmatchidx', type=s
 parser.add_argument('-o','--out', action="store", dest='out', type=str, help='outfile', nargs='?')
 parser.add_argument('-A','--array', action="store_true", dest='farm', help='is this being run on the farm? i.e. use LSB_JOBINDEX')
 parser.add_argument('-I','--init', action="store_true", dest='init', help='initialise matrix (will be done automatically if local)')
+parser.add_argument('-b','--blocksize', action="store", dest='blocksize', type=int, default=3000, help='block size (kb)', nargs='?')
 
 args = parser.parse_args()
 
@@ -48,7 +49,7 @@ idxfile = args.idxfile
 idxfile = idxfile.replace(".IDX.hdf5","")
 patternfile = args.patternfile
 tmatchidx = args.tmatchidx
-
+blocksize = args.blocksize
 #print >>sys.stderr, args.farm
 
 if args.farm is True:
@@ -84,7 +85,8 @@ for line in pfile:
 ratios = np.array(ratios,dtype='float')
 
 #guess chrname and blocksize from indexname
-fasta, blocksize = path.basename(idxfile).split('.')
+if blocksize is None:
+    fasta, blocksize = path.basename(idxfile).split('.')
 
 blocksize = int(blocksize)
 index = h5.File(idxfile+".IDX.hdf5", "r")

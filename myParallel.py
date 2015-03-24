@@ -16,13 +16,13 @@ class doThread (threading.Thread):
         #self.queue = q
         self.FUN = FUN
         self.args = args
-        print >>sys.stderr, "threadargs = ",args, "\nlen =",len(args)
+#        print >>sys.stderr, "threadargs = ",args, "\nlen =",len(args)
         if FUN is None:
             print >> sys.stderr, "cannot run a thread with a null function"
             sys.exit(1)
 
     def run(self):
-        print "Starting thread " + self.name
+#        print "Starting thread " + self.name
         while not (exitFlag or workQueue.empty()):
         #while not exitFlag:
             queueLock.acquire() #lock Q, ensure data only taken once
@@ -32,10 +32,11 @@ class doThread (threading.Thread):
             else:
 #                data = self.queue.get()
                 data= workQueue.get()
+                print "t:%s q:%s" % (self.threadID, workQueue.qsize())
                 queueLock.release()
-                print "%s processing %s\n" % (self.threadID, data)
+#                print "%s processing %s\n" % (self.threadID, data)
                 results = self.FUN(data, self.args)
-                print results
+ #               print results
             #sleep(5) #if queue empty, wait a second for others to catch up
                 
 class writeThread (threading.Thread):
@@ -63,10 +64,11 @@ def parallel(FUN, noThreads, workArray, *args):
 #    while workArray:
 #        block = workArray.next()
 #        print >>sys.stderr, "block = ",block
-        workQueue.put(set(block))
+        workQueue.put(block)
     queueLock.release()
 
     # get threads array - will need it to kill later...
+    print >>sys.stderr, "created queue [",workQueue.qsize(),"]"
     threads = []
     
     # Create new threads (one less than total threads)
