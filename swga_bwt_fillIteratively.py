@@ -35,7 +35,7 @@ parser = argparse.ArgumentParser(description='build index of genome matches in 3
 parser.add_argument('-p|--patterns', action="store", dest='patternfile', type=str, help='list of patterns', nargs='+')
 parser.add_argument('-i|--tmatchidx', action="store", dest='tmatchidx', type=str, help='match positions index', nargs='+')
 parser.add_argument('-o|--out', action="store", dest='out', type=str, help='outfile', nargs='?',default="outfile")
-parser.add_argument('-A|--array', action="store_true", dest='farm', help='run on farm? i.e. use LSB_JOBINDEX')
+# parser.add_argument('-A|--array', action="store_true", dest='farm', help='run on farm? i.e. use LSB_JOBINDEX')
 
 parser.add_argument('-c|--combs', action="store", dest='nCombs', default=1000, type=int, help='number of combinations to assess', nargs='?')
 parser.add_argument('-n|--bestN', action="store", dest='bestN', default=100, type=int, help='show best N combinations', nargs='?')

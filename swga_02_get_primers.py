@@ -137,7 +137,7 @@ if threads > 1:
 
     print >>sys.stderr, blocksize, primerBlocks
     primerBlocksL = list(primerBlocks)
-    parallel(_getMatchesBlock, threads, primerBlocksL)
+    parallel(_getMatchesBlock, threads, primerBlocks)
 else:
     print >>out, "#primer","total","rpk"
     for primer in primers:

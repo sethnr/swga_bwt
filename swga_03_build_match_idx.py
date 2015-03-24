@@ -110,8 +110,9 @@ if not path.exists(tmatchidx):
 #update index with new patterns
 #tmatchfile = open(tmatchidx,"r")
 # open match file for appending
-matchindex = h5.File(tmatchidx, 'r+')
-s.addMatchCountsHDF5(index, patterns, matchindex)
-matchindex.close()
+if args.init is False:
+    matchindex = h5.File(tmatchidx, 'r+')
+    s.addMatchCountsHDF5(index, patterns, matchindex)
+    matchindex.close()
 
 
