@@ -51,7 +51,7 @@ args = parser.parse_args()
 
 #pi = os.getenv("LSB_JOBINDEX")
 
-farm = args.farm
+# farm = args.farm
 #idxfile = args.idxfile[0]
 #idxfile = idxfile.replace(".IDX.hdf5","")
 #patternfile = args.patternfile[0]
@@ -161,7 +161,7 @@ def _getBestN(testFilled, filledPlex, k, reset=True):
 #    print filledBlocksPlex, sum(filledPlex), filledPlex.shape
 #    if sum(filledPlex) == filledBlocksPotential:
     if filledBlocksRemain == 0:
-      print >>sys.stderr, "no more fillable gaps"
+      print >>sys.stderr, "no more fillable gaps (reset:",reset,")"
       if reset:
         filledPlex = np.zeros((allBlocks,),dtype=bool) 
         testFilled = _setMatrix(minRatio, minCount, plex)

@@ -47,8 +47,10 @@ mkdir ./idx/
   -N <best N combinations 100> -r <min ratio target:background> -M <don't calculate max plex (exhaustive on large datasets)>
   -F forward weighting (bias of primer selection towards high-ratio samples) -c min no of counts in matrix -D decrease count and ratio for 1/D for D steps when chosing suboptimal
    
-  python swga_04_find_plex.py -p top200candidates.txt -i matchIdx.hdf5 -c 1000 \
-  -N 100 -k 20 -r 200 -c 100 -M 
+  python swga_04_assess_plexes.py -p top200candidates.txt -i matchIdx.hdf5 -c 1000 \
+  -n 100 -k 20 -r 200 -c 100 -M 
+
+
 
 
 5: show across genome
