@@ -208,22 +208,24 @@ testFilled = _setMatrix((minRatio - n*decrementRatio),
                           plex)
 
 #print >>sys.stderr, sum(filledPlex), allBlocks
-while _getTotalFills([p[-1] for p in (plex + subopt)],filled) < allBlocks:
+while (_getTotalFills([p[-1] for p in (plex + subopt)],filled) < allBlocks): # and n < (decs+1):
   suboptRatio = (minRatio - n*decrementRatio)
   suboptCount = (minCount - n*decrementCount)
   print >>sys.stderr, "getting suboptimal probes r",suboptRatio," c",suboptCount
   print sum(sum(testFilled)), "->",
   testFilled[filledPlex,:] = False
-  print sum(sum(testFilled))
+  print sum(sum(testFilled))   , "(",allBlocks,n,")"
   suboptNew=_getBestN(testFilled,filledPlex,5,reset=False)
   #print "plex", plex
   #print "subopt", subopt
+  print len(suboptNew),suboptNew[0]
   subopt = list(set(subopt + suboptNew))
 #  n += 1
   
 #  totalCoverage = _getTotalFills([p[-1] for p in (plex + subopt)],filled)
 #  coverageComb = _getTotalFills(pIs,filled)
   if n < decs: n +=1
+  elif n >= decs: break
 #  else if coverageComb == allBlocks: break
   else: 
     testFilled = _setMatrix((minRatio - n*decrementRatio), 
